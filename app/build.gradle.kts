@@ -13,7 +13,7 @@ dependencies {
 }
 
 
-val splitApks = !project.hasProperty("noSplits")
+val splitApks = false
 val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';').orEmpty()
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
 
@@ -27,21 +27,6 @@ android {
         targetSdk = 35
         versionCode = 1_002_000
         versionName = "1.2.0"
-
-        if (splitApks) {
-            splits {
-                abi {
-                    isEnable = true
-                    reset()
-                    include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-                    isUniversalApk = true
-                }
-            }
-        } else {
-            ndk {
-                abiFilters.addAll(abiFilterList)
-            }
-        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
