@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#1E293B"
+    android:background="#CCFFFFFF"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:padding="16dp">
@@ -19,7 +19,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Panchajanya"
-            android:textColor="#FFFFFF"
+            android:textColor="#0F172A"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -28,7 +28,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Tap to play music"
-            android:textColor="#94A3B8"
+            android:textColor="#64748B"
             android:textSize="12sp" />
     </LinearLayout>
 
@@ -39,7 +39,7 @@
         android:layout_height="wrap_content"
         android:padding="8dp"
         android:text="▶"
-        android:textColor="#2DD4BF"
+        android:textColor="#0D9488"
         android:textSize="24sp"
         android:textStyle="bold" />
 
