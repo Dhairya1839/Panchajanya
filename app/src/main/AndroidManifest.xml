@@ -10,6 +10,17 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        <receiver
+    android:name=".MediaWidgetReceiver"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/media_widget_info" />
+     </receiver>
+
         android:name=".PlayerApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
