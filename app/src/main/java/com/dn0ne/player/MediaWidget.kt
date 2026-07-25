@@ -1,4 +1,4 @@
-package dhairya1839.panchajanya
+package com.dn0ne.player
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import com.dn0ne.player.MainActivity
 
 class MediaWidget : AppWidgetProvider() {
 
@@ -28,11 +29,13 @@ class MediaWidget : AppWidgetProvider() {
             // Intent to launch main app when tapping widget
             val intent = Intent(context, MainActivity::class.java)
             val pendingIntent = PendingIntent.getActivity(
-                context, 0, intent,
+                context, 
+                0, 
+                intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Construct layout views (uses default simple widget layout)
+            // Construct layout views
             val views = RemoteViews(context.packageName, android.R.layout.activity_list_item)
             views.setOnClickPendingIntent(android.R.id.text1, pendingIntent)
 
