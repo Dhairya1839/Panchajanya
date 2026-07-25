@@ -1,25 +1,10 @@
 <div align="center">
-  <img src="fastlane/metadata/android/en-US/images/icon-fit.png" width="200px" />
+  <img src="fastlane/metadata/android/en-US/images/panchajanya_icon.png" width="200px" />
 
-  # Lotus
+  # Panchajanya
 
   ### Music player for Android
   
-</div>
-
-## Screenshots
-
-<div align="center">
-  <div>
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="24%" />
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="24%" />
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="24%" />
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="24%" />
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" width="24%" />
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" width="24%" />
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/7.png" width="24%" />
-    <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/8.png" width="24%" />
-  </div>
 </div>
 
 ## Features
@@ -30,31 +15,7 @@
 - Designed with [Material You](https://m3.material.io/) and supports dynamic color palettes
 
 ## Download
-Latest stable version is available on [GitHub releases](https://github.com/dn0ne/lotus/releases/latest)
-
-Stable releases are also available on [F-Droid](https://f-droid.org/packages/com.dn0ne.lotus)
-
-## Support
-If you enjoy using Lotus, consider [buying me a coffee](https://en.liberapay.com/dn0ne/donate)!
-
-## Build
-1. **Get the Source Code**  
-   - Clone the repository or download the source code:
-     ```bash
-     git clone https://github.com/dn0ne/lotus.git
-     ```
-
-2. **Open project in Android Studio**  
-   - Launch Android Studio.  
-   - Select **File > Open** and navigate to the project's folder.  
-   - Click **OK** to open the project.
-
-3. **Run the project**  
-   - Wait for the project to sync and build (Gradle sync may take some time).  
-   - Ensure a device or emulator is connected.  
-   - Click the **Run** button or press `Shift + F10` to build and launch the app.  
-
-That's it! The app should now be running. 
+Latest stable version is available on [GitHub releases](https://github.com/Dhairya1839/Panchajanya/releases/latest)
 
 ## Credits
 Some UI elements are inspired by [Vanilla](https://github.com/vanilla-music/vanilla)
