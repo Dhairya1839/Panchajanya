@@ -31,4 +31,4 @@ Lyrics UI is inspired by [Beautiful Lyrics](https://github.com/surfbryce/beautif
 [jaudiotagger](https://bitbucket.org/ijabz/jaudiotagger/src/master/)
 
 ## License
-Lotus is licensed under [GPLv3](LICENSE.md)
+Panchajanya is licensed under [GPLv3](LICENSE.md)
