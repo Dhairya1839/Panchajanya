@@ -6,6 +6,13 @@ plugins {
     alias(libs.plugins.realm)
 }
 
+dependencies {
+    // Jetpack Glance for Home Screen Widgets
+    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-material3:1.1.0")
+}
+
+
 val splitApks = !project.hasProperty("noSplits")
 val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';').orEmpty()
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
