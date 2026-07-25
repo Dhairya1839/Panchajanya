@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        <receiver
+        <receiver>
     android:name=".MediaWidgetReceiver"
     android:exported="true">
     <intent-filter>
