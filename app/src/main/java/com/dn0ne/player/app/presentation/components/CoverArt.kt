@@ -49,7 +49,7 @@ fun CoverArt(
                 onCoverArtLoaded(it.result.image.toBitmap().asImageBitmap())
             },
             onError = {
-                onCoverArtLoaded(it.result.image?.toBitmap()?.asImageBitmap())
+                onCoverArtLoaded(null)
             },
             contentScale = ContentScale.Crop,
             contentDescription = null,
