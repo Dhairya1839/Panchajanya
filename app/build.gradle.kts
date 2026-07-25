@@ -71,7 +71,7 @@ android {
     applicationVariants.all {
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "lotus-${defaultConfig.versionName}-${name}.apk"
+                "Panchjanya-${defaultConfig.versionName}-${name}.apk"
         }
     }
 
