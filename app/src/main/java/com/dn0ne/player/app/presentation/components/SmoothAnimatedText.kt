@@ -1,12 +1,15 @@
 package com.dn0ne.player.app.presentation.components
 
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
@@ -19,33 +22,32 @@ fun SmoothAnimatedText(
     modifier: Modifier = Modifier,
     style: TextStyle = TextStyle.Default,
     color: Color = Color.Unspecified,
-    wordDelayMs: Long = 250L,     // Time gap between words starting to appear
-    fadeDurationMs: Int = 600      // Speed of the fade-in for each word
+    wordDelayMs: Long = 200L,
+    fadeDurationMs: Int = 500
 ) {
     val words = remember(text) { text.split(" ") }
-    
-    // Create an alpha controller for each word
-    val alphas = remember(text) {
-        words.map { Animatable(0f) }
-    }
+    var visibleWordsCount by remember { mutableStateOf(0) }
 
     LaunchedEffect(text) {
-        alphas.forEachIndexed { index, animatable ->
-            delay(index * wordDelayMs)
-            animatable.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = fadeDurationMs)
-            )
+        for (i in 1..words.size) {
+            delay(wordDelayMs)
+            visibleWordsCount = i
         }
     }
 
     Row(modifier = modifier) {
         words.forEachIndexed { index, word ->
+            val alpha by animateFloatAsState(
+                targetValue = if (index < visibleWordsCount) 1f else 0f,
+                animationSpec = tween(durationMillis = fadeDurationMs),
+                label = "word_alpha"
+            )
+
             Text(
                 text = if (index == words.size - 1) word else "$word ",
                 style = style,
                 color = color,
-                modifier = Modifier.alpha(alphas[index].value)
+                modifier = Modifier.alpha(alpha)
             )
         }
     }
