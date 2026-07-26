@@ -1,6 +1,5 @@
 package com.dn0ne.player.core.presentation
 
-import com.dn0ne.player.app.presentation.components.SmoothAnimatedText
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -37,12 +36,10 @@ fun AppDetails(modifier: Modifier = Modifier) {
                 }
         )
 
-        SmoothAnimatedText(
+        Text(
     text = context.resources.getString(R.string.app_name),
     style = MaterialTheme.typography.displayMedium,
-    color = MaterialTheme.colorScheme.onBackground,
-    wordDelayMs = 200L,
-    fadeDurationMs = 500
+    fontWeight = FontWeight.SemiBold
         )
 
 
