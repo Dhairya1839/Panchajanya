@@ -1,5 +1,6 @@
 package com.dn0ne.player.setup.presentation
 
+import com.dn0ne.player.app.presentation.components.SmoothAnimatedText
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
