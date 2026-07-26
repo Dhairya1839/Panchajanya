@@ -40,9 +40,11 @@ fun AppDetails(modifier: Modifier = Modifier) {
         SmoothAnimatedText(
     text = context.resources.getString(R.string.app_name),
     style = MaterialTheme.typography.displayMedium,
+    color = MaterialTheme.colorScheme.onBackground,
     wordDelayMs = 200L,
     fadeDurationMs = 500
-         )
+        )
+
 
         Spacer(modifier = Modifier.height(4.dp))
 
