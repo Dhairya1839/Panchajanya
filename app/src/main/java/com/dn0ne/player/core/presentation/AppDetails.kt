@@ -28,20 +28,16 @@ fun AppDetails(modifier: Modifier = Modifier) {
         Image(
             painter = painterResource(R.drawable.ic_launcher_foreground),
             contentDescription = null,
-            modifier = Modifier
-                .size(200.dp)
-                .graphicsLayer {
-                    scaleX = 2f
-                    scaleY = 2f
-                }
+            modifier = Modifier.size(240.dp) // Set layout size directly without graphicsLayer scaling
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-    text = context.resources.getString(R.string.app_name),
-    style = MaterialTheme.typography.displayMedium,
-    fontWeight = FontWeight.SemiBold
+            text = context.resources.getString(R.string.app_name),
+            style = MaterialTheme.typography.displayMedium,
+            fontWeight = FontWeight.SemiBold
         )
-
 
         Spacer(modifier = Modifier.height(4.dp))
 
