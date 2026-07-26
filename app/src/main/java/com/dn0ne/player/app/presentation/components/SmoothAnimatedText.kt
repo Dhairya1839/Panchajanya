@@ -1,3 +1,5 @@
+package com.dn0ne.player.app.presentation.components
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Row
