@@ -1,6 +1,5 @@
 package com.dn0ne.player.setup.presentation.components
 
-import com.dn0ne.player.app.presentation.components.SmoothAnimatedText
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
