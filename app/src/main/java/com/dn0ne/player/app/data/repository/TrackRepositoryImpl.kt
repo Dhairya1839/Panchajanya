@@ -53,43 +53,19 @@ class TrackRepositoryImpl(
         val excludedScanFolders = settings.excludedScanFolders.value
         val ignoreShortTracks = settings.ignoreShortTracks
 
-        val selection = buildString {
+                val selection = buildString {
+            append("${MediaStore.Audio.Media.IS_MUSIC} != 0")
             if (ignoreShortTracks) {
-                append("${MediaStore.Audio.Media.DURATION} >= ? AND ")
+                append(" AND ${MediaStore.Audio.Media.DURATION} >= ?")
             }
-
-            append("(")
-            var scanFilter = ""
-            scanFilter = if (isScanModeInclusive) {
-                (listOf(scanMusicFolder).filter { it } + extraScanFolders)
-                    .joinToString(" OR ") {
-                        "${MediaStore.Audio.Media.DATA} LIKE ?"
-                    }
-            } else {
-                excludedScanFolders.joinToString(" AND ") {
-                    "${MediaStore.Audio.Media.DATA} NOT LIKE ?"
-                }
-            }
-            append(scanFilter.ifBlank { if (isScanModeInclusive) 0 else 1 })
-            append(")")
         }
 
         val selectionArgs = mutableListOf<String>().apply {
             if (ignoreShortTracks) {
                 add(TimeUnit.MILLISECONDS.convert(30, TimeUnit.SECONDS).toString())
             }
-
-            if (isScanModeInclusive) {
-                if (scanMusicFolder) {
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)?.path?.let {
-                        add("$it/%")
-                    }
-                }
-                addAll(extraScanFolders.map { "$it/%" })
-            } else {
-                addAll(excludedScanFolders.map { "$it/%" })
-            }
         }.toTypedArray()
+
 
         val query = context.contentResolver.query(
             collection,
