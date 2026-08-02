@@ -251,26 +251,12 @@ class MainActivity : ComponentActivity() {
                             val controllerFuture =
                                 MediaController.Builder(application, mediaSessionToken).buildAsync()
                             controllerFuture.addListener(
-                {
-                       val player = controllerFuture.get()
-                         viewModel.player = player
-
-                           // 1. Instantly sync UI with the currently playing track when reopening from background/Recents
-                            player.currentMediaItem?.let { mediaItem ->
-                              viewModel.updateCurrentTrack(mediaItem)
-                }
-
-                        // 2. Listen for track changes so UI updates as songs change automatically
-                          player.addListener(object : Player.Listener {
-                        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                           mediaItem?.let {
-                          viewModel.updateCurrentTrack(it)
-                       }
-                    }
-                  })
-                },
-                     MoreExecutors.directExecutor()
-                    )
+                             {
+                                 viewModel.player = controllerFuture.get()
+                              },
+                               MoreExecutors.directExecutor()
+                                )
+                            
                             
 
                             val appearance by viewModel.settings.appearance.collectAsState()
