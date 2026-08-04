@@ -38,7 +38,9 @@
             android:launchMode="singleTop"
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MusicPlayer.Splash">
+            android:taskAffinity=""
+
+ android:theme="@style/Theme.MusicPlayer.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
