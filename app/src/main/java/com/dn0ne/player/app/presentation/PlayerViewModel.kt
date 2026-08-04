@@ -388,8 +388,20 @@ class PlayerViewModel(
                     if (_playbackState.value.playlist != event.playlist) {
                         player.clearMediaItems()
                         player.addMediaItems(
-                            event.playlist.trackList.fastMap { track -> track.mediaItem }
-                        )
+    event.playlist.trackList.fastMap { track ->
+        track.mediaItem.buildUpon()
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(track.title)
+                    .setArtist(track.artist ?: "Unknown Artist")
+                    .setDisplayTitle(track.title)
+                    .build()
+            )
+            .build()
+    }
+)
+
+
                         player.prepare()
                     }
                     player.seekTo(
