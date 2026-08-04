@@ -272,7 +272,20 @@ class PlayerViewModel(
                 val track = playlist.trackList.getOrNull(index)
 
                 if (player?.mediaItemCount == 0) {
-                    player?.addMediaItems(playlist.trackList.fastMap { it.mediaItem })
+                    player?.addMediaItems(
+    playlist.trackList.fastMap { track ->
+        track.mediaItem.buildUpon()
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(track.title)
+                    .setArtist(track.artist ?: "Unknown Artist")
+                    .setDisplayTitle(track.title) // Explicitly read by OnePlus Live Alerts
+                    .build()
+            )
+            .build()
+    }
+)
+
                     if (index >= 0) {
                         player?.seekTo(index, 0L)
                     }
