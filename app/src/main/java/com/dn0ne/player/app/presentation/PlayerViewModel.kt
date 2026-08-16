@@ -263,50 +263,47 @@ class PlayerViewModel(
         }
 
         viewModelScope.launch {
-            while (player == null) delay(100L)
+            while (player == null) delay(500L)
 
-            val activePlayer = player ?: return@launch
             val playlist = savedPlayerState.playlist
+            playlist?.let { playlist ->
+                val trackMediaItem = player?.currentMediaItem ?: savedPlayerState.track?.mediaItem
+                val index = playlist.trackList.indexOfFirst { trackMediaItem == it.mediaItem }
+                val track = playlist.trackList.getOrNull(index)
 
-            playlist?.let { currentPlaylist ->
-                val activeIndex = if (activePlayer.mediaItemCount > 0) {
-                    activePlayer.currentMediaItemIndex
-                } else {
-                    val savedTrackItem = savedPlayerState.track?.mediaItem
-                    currentPlaylist.trackList.indexOfFirst { it.mediaItem == savedTrackItem }.coerceAtLeast(0)
-                }
+                if (player?.mediaItemCount == 0) {
+                    player?.addMediaItems(
+    playlist.trackList.fastMap { track ->
+        track.mediaItem.buildUpon()
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(track.title)
+                    .setArtist(track.artist ?: "Unknown Artist")
+                    .setDisplayTitle(track.title) // Explicitly read by OnePlus Live Alerts
+                    .build()
+            )
+            .build()
+    }
+)
 
-                val track = currentPlaylist.trackList.getOrNull(activeIndex)
-
-                if (activePlayer.mediaItemCount == 0) {
-                    activePlayer.addMediaItems(
-                        currentPlaylist.trackList.fastMap { trackItem ->
-                            trackItem.mediaItem.buildUpon()
-                                .setMediaMetadata(
-                                    androidx.media3.common.MediaMetadata.Builder()
-                                        .setTitle(trackItem.title)
-                                        .setArtist(trackItem.artist ?: "Unknown Artist")
-                                        .setDisplayTitle(trackItem.title)
-                                        .build()
-                                )
-                                .build()
-                        }
-                    )
-                    if (activeIndex >= 0) {
-                        activePlayer.seekTo(activeIndex, 0L)
+                    if (index >= 0) {
+                        player?.seekTo(index, 0L)
                     }
                 }
 
                 _playbackState.update {
                     it.copy(
-                        playlist = currentPlaylist,
+                        playlist = playlist,
                         currentTrack = track,
-                        isPlaying = activePlayer.isPlaying,
-                        position = activePlayer.currentPosition
+                        isPlaying = player!!.isPlaying,
+                        position = player!!.currentPosition
                     )
                 }
+
+                if (player!!.isPlaying) {
+                    positionUpdateJob = startPositionUpdate()
+                }
             }
-        }
 
             val playbackMode = savedPlayerState.playbackMode
             setPlayerPlaybackMode(playbackMode)
@@ -331,38 +328,30 @@ class PlayerViewModel(
                         }
                     }
 
-                             val activePlaylist = _playbackState.value.playlist ?: savedPlayerState.playlist
-            val currentIndex = player?.currentMediaItemIndex ?: -1
+                    override fun onMediaItemTransition(
+                        mediaItem: MediaItem?,
+                        reason: Int
+                    ) {
+                        _playbackState.update {
+                            it.copy(
+                                currentTrack = it.playlist?.trackList?.fastFirstOrNull {
+                                    it.mediaItem == mediaItem
+                                }.also { savedPlayerState.track = it },
+                                position = 0L
+                            )
+                        }
 
-            val currentTrack = if (currentIndex >= 0) {
-                activePlaylist?.trackList?.getOrNull(currentIndex)
-            } else {
-                null
-            } ?: activePlaylist?.trackList?.fastFirstOrNull { track ->
-                track.mediaItem == mediaItem || track.mediaItem.mediaId == mediaItem?.mediaId
-            } ?: _playbackState.value.currentTrack
+                        if (_playbackState.value.isLyricsSheetExpanded) {
+                            loadLyrics()
+                        }
 
-            currentTrack?.let { savedPlayerState.track = it }
-
-            _playbackState.update { state ->
-                state.copy(
-                    playlist = activePlaylist,
-                    currentTrack = currentTrack,
-                    position = 0L
-                )
-            }
-
-            if (_playbackState.value.isLyricsSheetExpanded) {
-                loadLyrics()
-            }
-
-            positionUpdateJob?.cancel()
-            positionUpdateJob = startPositionUpdate()
-        }
-   
-                    
+                        positionUpdateJob?.cancel()
+                        positionUpdateJob = startPositionUpdate()
+                    }
                 }
             )
+
+        }
 
         viewModelScope.launch {
             while (_trackList.value.isEmpty() || player == null) delay(500)
@@ -390,32 +379,7 @@ class PlayerViewModel(
             }
         }
     }
-    
-    fun handleIntent(intent: android.content.Intent?) {
-    player?.let { activePlayer ->
-        val currentMediaItem = activePlayer.currentMediaItem ?: return@let
-        val currentPlaylist = _playbackState.value.playlist ?: savedPlayerState.playlist
 
-        // 1. Find the track matching the active MediaItem
-        val track = currentPlaylist?.trackList?.find { track ->
-            track.mediaItem.mediaId == currentMediaItem.mediaId ||
-            track.mediaItem.localConfiguration?.uri == currentMediaItem.localConfiguration?.uri ||
-            track.title == currentMediaItem.mediaMetadata.title?.toString()
-        }
-
-        // 2. Push both currentTrack and isPlaying to the UI state
-        _playbackState.update { state ->
-            state.copy(
-                playlist = currentPlaylist,
-                currentTrack = track ?: state.currentTrack,
-                isPlaying = activePlayer.isPlaying
-            )
-        }
-    }
-    }
-    
-
-    
     fun onEvent(event: PlayerScreenEvent) {
 
         when (event) {
@@ -1591,7 +1555,6 @@ class PlayerViewModel(
             )
         }
     }
-    
 
     /**
      * Returns next element after [index]. If next element index is out of bounds returns first element.
