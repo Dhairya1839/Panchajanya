@@ -332,31 +332,36 @@ class PlayerViewModel(
     mediaItem: MediaItem?,
     reason: Int
 ) {
+    val activePlaylist = _playbackState.value.playlist ?: savedPlayerState.playlist
+    val currentIndex = player?.currentMediaItemIndex ?: -1
+
+    // Grab the exact track using the player's active playlist index
+    val currentTrack = if (currentIndex >= 0) {
+        activePlaylist?.trackList?.getOrNull(currentIndex)
+    } else {
+        null
+    } ?: activePlaylist?.trackList?.fastFirstOrNull { track ->
+        track.mediaItem == mediaItem || track.mediaItem.mediaId == mediaItem?.mediaId
+    } ?: _playbackState.value.currentTrack
+
+    currentTrack?.let { savedPlayerState.track = it }
+
     _playbackState.update { state ->
-        val activePlaylist = state.playlist ?: savedPlayerState.playlist
-        val currentTrack = activePlaylist?.trackList?.fastFirstOrNull { track ->
-            track.mediaItem.mediaId == mediaItem?.mediaId ||
-            track.mediaItem.localConfiguration?.uri == mediaItem?.localConfiguration?.uri ||
-            track.title == mediaItem?.mediaMetadata?.title?.toString()
-        } ?: state.currentTrack
-
-        currentTrack?.let { savedPlayerState.track = it }
-
         state.copy(
             playlist = activePlaylist,
             currentTrack = currentTrack,
             position = 0L
         )
     }
-                    
 
-                        if (_playbackState.value.isLyricsSheetExpanded) {
-                            loadLyrics()
-                        }
+    if (_playbackState.value.isLyricsSheetExpanded) {
+        loadLyrics()
+    }
 
-                        positionUpdateJob?.cancel()
-                        positionUpdateJob = startPositionUpdate()
+    positionUpdateJob?.cancel()
+    positionUpdateJob = startPositionUpdate()
                     }
+                    
                 }
             )
 
