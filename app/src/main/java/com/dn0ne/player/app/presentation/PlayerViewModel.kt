@@ -1574,7 +1574,7 @@ class PlayerViewModel(
                 }
             }
         }
-    }
+    
 
     fun parseM3U(playlistName: String, fileContent: String) {
         viewModelScope.launch {
