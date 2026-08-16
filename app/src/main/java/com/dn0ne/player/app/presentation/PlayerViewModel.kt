@@ -295,7 +295,7 @@ class PlayerViewModel(
                     if (index >= 0) {
                         activePlayer.seekTo(index, 0L)
                     }
-                }
+                
 
                 _playbackState.update {
                     it.copy(
