@@ -379,7 +379,21 @@ class PlayerViewModel(
             }
         }
     }
+    
+    fun handleIntent(intent: android.content.Intent?) {
+    player?.let { activePlayer ->
+        val currentMediaItem = activePlayer.currentMediaItem
+        if (currentMediaItem != null) {
+            _playbackState.update { state ->
+                state.copy(
+                    isPlaying = activePlayer.isPlaying
+                )
+            }
+        }
+    }
+}
 
+    
     fun onEvent(event: PlayerScreenEvent) {
 
         when (event) {
