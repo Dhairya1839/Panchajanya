@@ -406,7 +406,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        viewModel.handleIntent(intent)
+        getViewModel<PlayerViewModel>().handleIntent(intent)
 
         if (intent.action == Intent.ACTION_VIEW) {
             val trackUri = intent.data
