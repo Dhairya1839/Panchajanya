@@ -278,7 +278,7 @@ class PlayerViewModel(
 
                 val track = currentPlaylist.trackList.getOrNull(activeIndex)
 
-                if (activePlayer.mediaItemCount == 0) {
+                                if (activePlayer.mediaItemCount == 0) {
                     activePlayer.addMediaItems(
                         currentPlaylist.trackList.fastMap { trackItem ->
                             trackItem.mediaItem.buildUpon()
@@ -288,10 +288,11 @@ class PlayerViewModel(
                                         .setArtist(trackItem.artist ?: "Unknown Artist")
                                         .setDisplayTitle(trackItem.title)
                                         .build()
-                                raid()
+                                )
                                 .build()
                         }
                     )
+                    
                     if (activeIndex >= 0) {
                         activePlayer.seekTo(activeIndex, 0L)
                     }
