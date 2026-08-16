@@ -307,13 +307,7 @@ class PlayerViewModel(
                     )
                 }
             }
-                        }
-                        
-
-                if (player!!.isPlaying) {
-                    positionUpdateJob = startPositionUpdate()
-                }
-            }
+         }
 
             val playbackMode = savedPlayerState.playbackMode
             setPlayerPlaybackMode(playbackMode)
@@ -1612,4 +1606,4 @@ class PlayerViewModel(
     private fun <T> List<T>.nextAfterOrNull(index: Int): T? {
         return getOrNull((index + 1) % size)
     }
-
+}
