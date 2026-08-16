@@ -364,8 +364,6 @@ class PlayerViewModel(
                 }
             )
 
-        }
-
         viewModelScope.launch {
             while (_trackList.value.isEmpty() || player == null) delay(500)
 
