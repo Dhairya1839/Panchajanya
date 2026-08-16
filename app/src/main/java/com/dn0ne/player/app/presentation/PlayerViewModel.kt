@@ -1606,4 +1606,4 @@ class PlayerViewModel(
     private fun <T> List<T>.nextAfterOrNull(index: Int): T? {
         return getOrNull((index + 1) % size)
     }
-}
+
