@@ -382,16 +382,27 @@ class PlayerViewModel(
     
     fun handleIntent(intent: android.content.Intent?) {
     player?.let { activePlayer ->
-        val currentMediaItem = activePlayer.currentMediaItem
-        if (currentMediaItem != null) {
-            _playbackState.update { state ->
-                state.copy(
-                    isPlaying = activePlayer.isPlaying
-                )
-            }
+        val currentMediaItem = activePlayer.currentMediaItem ?: return@let
+        val currentPlaylist = _playbackState.value.playlist ?: savedPlayerState.playlist
+
+        // 1. Find the track matching the active MediaItem
+        val track = currentPlaylist?.trackList?.find { track ->
+            track.mediaItem.mediaId == currentMediaItem.mediaId ||
+            track.mediaItem.localConfiguration?.uri == currentMediaItem.localConfiguration?.uri ||
+            track.title == currentMediaItem.mediaMetadata.title?.toString()
+        }
+
+        // 2. Push both currentTrack and isPlaying to the UI state
+        _playbackState.update { state ->
+            state.copy(
+                playlist = currentPlaylist,
+                currentTrack = track ?: state.currentTrack,
+                isPlaying = activePlayer.isPlaying
+            )
         }
     }
-}
+    }
+    
 
     
     fun onEvent(event: PlayerScreenEvent) {
