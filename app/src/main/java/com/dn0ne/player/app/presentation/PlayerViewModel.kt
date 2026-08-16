@@ -262,48 +262,57 @@ class PlayerViewModel(
             }
         }
 
-        viewModelScope.launch {
+                viewModelScope.launch {
             while (player == null) delay(500L)
 
+            val activePlayer = player ?: return@launch
             val playlist = savedPlayerState.playlist
-            playlist?.let { playlist ->
-                val trackMediaItem = player?.currentMediaItem ?: savedPlayerState.track?.mediaItem
-                val index = playlist.trackList.indexOfFirst { trackMediaItem == it.mediaItem }
-                val track = playlist.trackList.getOrNull(index)
 
-                if (player?.mediaItemCount == 0) {
-                    player?.addMediaItems(
-    playlist.trackList.fastMap { track ->
-        track.mediaItem.buildUpon()
-            .setMediaMetadata(
-                androidx.media3.common.MediaMetadata.Builder()
-                    .setTitle(track.title)
-                    .setArtist(track.artist ?: "Unknown Artist")
-                    .setDisplayTitle(track.title) // Explicitly read by OnePlus Live Alerts
-                    .build()
-            )
-            .build()
-    }
-)
+            playlist?.let { currentPlaylist ->
+                // 1. Identify the media item from the active player or saved state
+                val trackMediaItem = activePlayer.currentMediaItem ?: savedPlayerState.track?.mediaItem
+                
+                // 2. Find its index in the current playlist
+                val index = currentPlaylist.trackList.indexOfFirst { trackMediaItem == it.mediaItem }
+                
+                // 3. Get the track, falling back to the saved track if the index wasn't in this list
+                val track = currentPlaylist.trackList.getOrNull(index) ?: savedPlayerState.track
 
+                if (activePlayer.mediaItemCount == 0) {
+                    activePlayer.addMediaItems(
+                        currentPlaylist.trackList.fastMap { trackItem ->
+                            trackItem.mediaItem.buildUpon()
+                                .setMediaMetadata(
+                                    androidx.media3.common.MediaMetadata.Builder()
+                                        .setTitle(trackItem.title)
+                                        .setArtist(trackItem.artist ?: "Unknown Artist")
+                                        .setDisplayTitle(trackItem.title)
+                                        .build()
+                                )
+                                .build()
+                        }
+                    )
                     if (index >= 0) {
-                        player?.seekTo(index, 0L)
+                        activePlayer.seekTo(index, 0L)
                     }
                 }
 
                 _playbackState.update {
                     it.copy(
-                        playlist = playlist,
+                        playlist = currentPlaylist,
                         currentTrack = track,
-                        isPlaying = player!!.isPlaying,
-                        position = player!!.currentPosition
+                        isPlaying = activePlayer.isPlaying,
+                        position = activePlayer.currentPosition
                     )
                 }
 
-                if (player!!.isPlaying) {
+                if (activePlayer.isPlaying) {
+                    positionUpdateJob?.cancel()
                     positionUpdateJob = startPositionUpdate()
                 }
             }
+        }
+
 
             val playbackMode = savedPlayerState.playbackMode
             setPlayerPlaybackMode(playbackMode)
