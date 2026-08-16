@@ -262,7 +262,7 @@ class PlayerViewModel(
             }
         }
 
-         viewModelScope.launch {
+        viewModelScope.launch {
             while (player == null) delay(100L)
 
             val activePlayer = player ?: return@launch
@@ -278,7 +278,7 @@ class PlayerViewModel(
 
                 val track = currentPlaylist.trackList.getOrNull(activeIndex)
 
-                                if (activePlayer.mediaItemCount == 0) {
+                if (activePlayer.mediaItemCount == 0) {
                     activePlayer.addMediaItems(
                         currentPlaylist.trackList.fastMap { trackItem ->
                             trackItem.mediaItem.buildUpon()
@@ -292,7 +292,6 @@ class PlayerViewModel(
                                 .build()
                         }
                     )
-                    
                     if (activeIndex >= 0) {
                         activePlayer.seekTo(activeIndex, 0L)
                     }
@@ -307,7 +306,7 @@ class PlayerViewModel(
                     )
                 }
             }
-         }
+        }
 
             val playbackMode = savedPlayerState.playbackMode
             setPlayerPlaybackMode(playbackMode)
@@ -332,39 +331,35 @@ class PlayerViewModel(
                         }
                     }
 
-                    override fun onMediaItemTransition(
-    mediaItem: MediaItem?,
-    reason: Int
-) {
-    val activePlaylist = _playbackState.value.playlist ?: savedPlayerState.playlist
-    val currentIndex = player?.currentMediaItemIndex ?: -1
+                             val activePlaylist = _playbackState.value.playlist ?: savedPlayerState.playlist
+            val currentIndex = player?.currentMediaItemIndex ?: -1
 
-    // Grab the exact track using the player's active playlist index
-    val currentTrack = if (currentIndex >= 0) {
-        activePlaylist?.trackList?.getOrNull(currentIndex)
-    } else {
-        null
-    } ?: activePlaylist?.trackList?.fastFirstOrNull { track ->
-        track.mediaItem == mediaItem || track.mediaItem.mediaId == mediaItem?.mediaId
-    } ?: _playbackState.value.currentTrack
+            val currentTrack = if (currentIndex >= 0) {
+                activePlaylist?.trackList?.getOrNull(currentIndex)
+            } else {
+                null
+            } ?: activePlaylist?.trackList?.fastFirstOrNull { track ->
+                track.mediaItem == mediaItem || track.mediaItem.mediaId == mediaItem?.mediaId
+            } ?: _playbackState.value.currentTrack
 
-    currentTrack?.let { savedPlayerState.track = it }
+            currentTrack?.let { savedPlayerState.track = it }
 
-    _playbackState.update { state ->
-        state.copy(
-            playlist = activePlaylist,
-            currentTrack = currentTrack,
-            position = 0L
-        )
-    }
+            _playbackState.update { state ->
+                state.copy(
+                    playlist = activePlaylist,
+                    currentTrack = currentTrack,
+                    position = 0L
+                )
+            }
 
-    if (_playbackState.value.isLyricsSheetExpanded) {
-        loadLyrics()
-    }
+            if (_playbackState.value.isLyricsSheetExpanded) {
+                loadLyrics()
+            }
 
-    positionUpdateJob?.cancel()
-    positionUpdateJob = startPositionUpdate()
-                    }
+            positionUpdateJob?.cancel()
+            positionUpdateJob = startPositionUpdate()
+        }
+   
                     
                 }
             )
@@ -1574,7 +1569,7 @@ class PlayerViewModel(
                 }
             }
         }
-    
+    }
 
     fun parseM3U(playlistName: String, fileContent: String) {
         viewModelScope.launch {
@@ -1598,6 +1593,7 @@ class PlayerViewModel(
             )
         }
     }
+    
 
     /**
      * Returns next element after [index]. If next element index is out of bounds returns first element.
@@ -1606,4 +1602,4 @@ class PlayerViewModel(
     private fun <T> List<T>.nextAfterOrNull(index: Int): T? {
         return getOrNull((index + 1) % size)
     }
-
+}
