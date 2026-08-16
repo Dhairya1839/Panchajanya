@@ -329,17 +329,26 @@ class PlayerViewModel(
                     }
 
                     override fun onMediaItemTransition(
-                        mediaItem: MediaItem?,
-                        reason: Int
-                    ) {
-                        _playbackState.update {
-                            it.copy(
-                                currentTrack = it.playlist?.trackList?.fastFirstOrNull {
-                                    it.mediaItem == mediaItem
-                                }.also { savedPlayerState.track = it },
-                                position = 0L
-                            )
-                        }
+    mediaItem: MediaItem?,
+    reason: Int
+) {
+    _playbackState.update { state ->
+        val activePlaylist = state.playlist ?: savedPlayerState.playlist
+        val currentTrack = activePlaylist?.trackList?.fastFirstOrNull { track ->
+            track.mediaItem.mediaId == mediaItem?.mediaId ||
+            track.mediaItem.localConfiguration?.uri == mediaItem?.localConfiguration?.uri ||
+            track.title == mediaItem?.mediaMetadata?.title?.toString()
+        } ?: state.currentTrack
+
+        currentTrack?.let { savedPlayerState.track = it }
+
+        state.copy(
+            playlist = activePlaylist,
+            currentTrack = currentTrack,
+            position = 0L
+        )
+    }
+                    
 
                         if (_playbackState.value.isLyricsSheetExpanded) {
                             loadLyrics()
