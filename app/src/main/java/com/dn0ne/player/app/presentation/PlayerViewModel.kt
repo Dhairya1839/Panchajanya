@@ -337,26 +337,51 @@ class PlayerViewModel(
                         }
                     }
 
-                    override fun onMediaItemTransition(
-                        mediaItem: MediaItem?,
-                        reason: Int
-                    ) {
-                        _playbackState.update {
-                            it.copy(
-                                currentTrack = it.playlist?.trackList?.fastFirstOrNull {
-                                    it.mediaItem == mediaItem
-                                }.also { savedPlayerState.track = it },
-                                position = 0L
-                            )
-                        }
+                            override fun onMediaItemTransition(
+            mediaItem: MediaItem?,
+            reason: Int
+        ) {
+            val activePlaylist = _playbackState.value.playlist ?: savedPlayerState.playlist
+            val currentIndex = player?.currentMediaItemIndex ?: -1
 
-                        if (_playbackState.value.isLyricsSheetExpanded) {
-                            loadLyrics()
-                        }
+            // 1. First try by exact index in playlist
+            var currentTrack = if (currentIndex >= 0) {
+                activePlaylist?.trackList?.getOrNull(currentIndex)
+            } else {
+                null
+            }
 
-                        positionUpdateJob?.cancel()
-                        positionUpdateJob = startPositionUpdate()
+            // 2. If index lookup failed or was out of bounds, match by mediaId or URI
+            if (currentTrack == null && mediaItem != null) {
+                currentTrack = activePlaylist?.trackList?.fastFirstOrNull { track ->
+                    track.mediaItem.mediaId == mediaItem.mediaId ||
+                    track.mediaItem.localConfiguration?.uri == mediaItem.localConfiguration?.uri ||
+                    track.title == mediaItem.mediaMetadata.title?.toString()
+                }
+            }
+
+            // 3. Fallback to existing track if transition produced null to prevent UI from blanking out
+            val finalTrack = currentTrack ?: _playbackState.value.currentTrack
+
+            finalTrack?.let { savedPlayerState.track = it }
+
+            _playbackState.update { state ->
+                state.copy(
+                    playlist = activePlaylist,
+                    currentTrack = finalTrack,
+                    position = 0L,
+                    isPlaying = player?.isPlaying ?: state.isPlaying
+                )
+            }
+
+            if (_playbackState.value.isLyricsSheetExpanded) {
+                loadLyrics()
+            }
+
+            positionUpdateJob?.cancel()
+            positionUpdateJob = startPositionUpdate()
                     }
+                            
                 }
             )
 
