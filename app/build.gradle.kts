@@ -18,7 +18,7 @@ val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';').orEmpty()
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
 
 android {
-    namespace = "com.dhairya.panchajanya"
+    namespace = "com.dn0ne.player"
     compileSdk = 35
 
     defaultConfig {
