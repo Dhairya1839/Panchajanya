@@ -6,9 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
-import android.os.Environment
 import androidx.core.content.FileProvider
-import com.dn0ne.player.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -22,7 +20,7 @@ object GitHubUpdater {
 
     data class UpdateInfo(val isAvailable: Boolean, val version: String, val downloadUrl: String)
 
-    suspend fun checkUpdate(): UpdateInfo = withContext(Dispatchers.IO) {
+    suspend fun checkUpdate(context: Context): UpdateInfo = withContext(Dispatchers.IO) {
         try {
             val url = URL(API_URL)
             val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -35,7 +33,10 @@ object GitHubUpdater {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
                 val latestTag = json.getString("tag_name").removePrefix("v")
-                val currentVersion = BuildConfig.VERSION_NAME
+
+                // Read version directly from package manager without BuildConfig
+                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                val currentVersion = packageInfo.versionName ?: "0.0.0"
 
                 val assets = json.getJSONArray("assets")
                 var downloadUrl = ""
