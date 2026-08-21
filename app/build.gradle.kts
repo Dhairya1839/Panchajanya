@@ -18,11 +18,11 @@ val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';').orEmpty()
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
 
 android {
-    namespace = "com.dn0ne.player"
+    namespace = "com.dhairya.panchajanya"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.dn0ne.lotus"
+        applicationId = "com.dhairya.panchajanya"
         minSdk = 24
         targetSdk = 35
         versionCode = 1_002_000
@@ -58,7 +58,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            isShrinkResources = false
+            isShrinkResources = true
             isCrunchPngs = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
