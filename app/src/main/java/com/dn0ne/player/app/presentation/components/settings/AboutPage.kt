@@ -109,7 +109,7 @@ fun AboutPage(
                     icon = Icons.Rounded.SystemUpdate,
                     onClick = {
                         scope.launch {
-                            val update = GitHubUpdater.checkUpdate()
+                            val update = GitHubUpdater.checkUpdate(context)
                             if (update.isAvailable) {
                                 updateAvailable = true
                                 latestUrl = update.downloadUrl
