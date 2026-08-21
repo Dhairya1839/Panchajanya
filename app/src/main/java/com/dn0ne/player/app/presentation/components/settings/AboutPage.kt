@@ -1,5 +1,6 @@
 package com.dn0ne.player.app.presentation.components.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,9 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.QuestionAnswer
+import androidx.compose.material.icons.rounded.SystemUpdate
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -18,7 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +38,8 @@ import androidx.compose.ui.unit.lerp
 import com.dn0ne.player.R
 import com.dn0ne.player.app.presentation.components.topbar.ColumnWithCollapsibleTopBar
 import com.dn0ne.player.core.presentation.AppDetails
+import com.dn0ne.player.updater.GitHubUpdater
+import kotlinx.coroutines.launch
 
 @Composable
 fun AboutPage(
@@ -39,9 +47,14 @@ fun AboutPage(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var collapseFraction by remember {
         mutableFloatStateOf(0f)
     }
+
+    var updateAvailable by remember { mutableStateOf(false) }
+    var latestUrl by remember { mutableStateOf("") }
+    var newVersionName by remember { mutableStateOf("") }
 
     ColumnWithCollapsibleTopBar(
         topBarContent = {
@@ -91,6 +104,23 @@ fun AboutPage(
         SettingsGroup(
             items = listOf(
                 SettingsItem(
+                    title = "Check for updates",
+                    supportingText = "Fetch the latest release from GitHub",
+                    icon = Icons.Rounded.SystemUpdate,
+                    onClick = {
+                        scope.launch {
+                            val update = GitHubUpdater.checkUpdate()
+                            if (update.isAvailable) {
+                                updateAvailable = true
+                                latestUrl = update.downloadUrl
+                                newVersionName = update.version
+                            } else {
+                                Toast.makeText(context, "Panchajanya is up to date!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                ),
+                SettingsItem(
                     title = context.resources.getString(R.string.repo),
                     supportingText = context.resources.getString(R.string.repo_explain),
                     icon = repoIcon,
@@ -107,6 +137,27 @@ fun AboutPage(
                     }
                 )
             )
+        )
+    }
+
+    if (updateAvailable) {
+        AlertDialog(
+            onDismissRequest = { updateAvailable = false },
+            title = { Text("Update Available ($newVersionName)") },
+            text = { Text("A new version of Panchajanya is available. Would you like to download and install it now?") },
+            confirmButton = {
+                Button(onClick = {
+                    updateAvailable = false
+                    GitHubUpdater.downloadAndInstall(context, latestUrl)
+                }) {
+                    Text("Update & Install")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { updateAvailable = false }) {
+                    Text("Later")
+                }
+            }
         )
     }
 }
