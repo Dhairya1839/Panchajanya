@@ -46,8 +46,6 @@ class JamManager(private val context: Context) {
     private var incomingPayload: Payload? = null
     private var pendingFileName: String = "temp_jam_audio.mp3"
 
-    // --- HOST METHODS ---
-
     fun startHosting(hostName: String) {
         val advertisingOptions = AdvertisingOptions.Builder().setStrategy(strategy).build()
 
@@ -63,8 +61,6 @@ class JamManager(private val context: Context) {
             Toast.makeText(context, "Failed to start: ${it.message}", Toast.LENGTH_SHORT).show()
         }
     }
-
-    // --- GUEST METHODS ---
 
     fun startDiscovering() {
         _discoveredHosts.value = emptyList()
@@ -87,8 +83,6 @@ class JamManager(private val context: Context) {
                 Toast.makeText(context, "Connection failed: ${it.message}", Toast.LENGTH_SHORT).show()
             }
     }
-
-    // --- DATA & SYNC METHODS ---
 
     fun sendCommand(command: JamCommand) {
         val payload = Payload.fromBytes(command.toJson().toByteArray(StandardCharsets.UTF_8))
@@ -123,8 +117,6 @@ class JamManager(private val context: Context) {
         _connectedPeers.value = emptyList()
         _discoveredHosts.value = emptyList()
     }
-
-    // --- NEARBY CALLBACKS ---
 
     private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
