@@ -12,7 +12,6 @@ import com.google.android.gms.nearby.connection.ConnectionResolution
 import com.google.android.gms.nearby.connection.ConnectionsClient
 import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
 import com.google.android.gms.nearby.connection.DiscoveryOptions
-import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback
 import com.google.android.gms.nearby.connection.Payload
 import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
@@ -21,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
 
 class JamManager(private val context: Context) {
@@ -38,11 +39,11 @@ class JamManager(private val context: Context) {
     private val _discoveredHosts = MutableStateFlow<List<DiscoveredHost>>(emptyList())
     val discoveredHosts: StateFlow<List<DiscoveredHost>> = _discoveredHosts.asStateFlow()
 
-    // Callbacks for the media player listener
+    // Callbacks for media player events
     var onCommandReceived: ((JamCommand) -> Unit)? = null
     var onAudioFileReceived: ((File) -> Unit)? = null
 
-    private var incomingFilePayloadId: Long? = null
+    private var incomingPayload: Payload? = null
     private var pendingFileName: String = "temp_jam_audio.mp3"
 
     // --- HOST METHODS ---
@@ -57,9 +58,9 @@ class JamManager(private val context: Context) {
             advertisingOptions
         ).addOnSuccessListener {
             _jamRole.value = JamRole.HOST
-            Toast.makeText(context, "Jam started! Waiting for friends...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Shankhanaad session started!", Toast.LENGTH_SHORT).show()
         }.addOnFailureListener {
-            Toast.makeText(context, "Failed to start Jam: ${it.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Failed to start: ${it.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -76,7 +77,7 @@ class JamManager(private val context: Context) {
         ).addOnSuccessListener {
             _jamRole.value = JamRole.GUEST
         }.addOnFailureListener {
-            Toast.makeText(context, "Failed to discover Jams: ${it.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Discovery failed: ${it.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -99,7 +100,6 @@ class JamManager(private val context: Context) {
 
     fun sendAudioFile(uri: Uri, fileName: String) {
         try {
-            // First notify guest of the incoming file name
             sendCommand(JamCommand(action = JamAction.FILE_INCOMING, fileName = fileName))
 
             val pfd: ParcelFileDescriptor? = context.contentResolver.openFileDescriptor(uri, "r")
@@ -142,7 +142,6 @@ class JamManager(private val context: Context) {
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
-            // Auto-accept connection on both host and guest side
             connectionsClient.acceptConnection(endpointId, payloadCallback)
         }
 
@@ -153,7 +152,7 @@ class JamManager(private val context: Context) {
                     current.add(endpointId)
                     _connectedPeers.value = current
                 }
-                Toast.makeText(context, "Connected to Jam!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Connected to Shankhanaad!", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -166,7 +165,8 @@ class JamManager(private val context: Context) {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             when (payload.type) {
                 Payload.Type.BYTES -> {
-                    val jsonStr = String(payload.asBytes() ?: return, StandardCharsets.UTF_8)
+                    val bytes = payload.asBytes() ?: return
+                    val jsonStr = String(bytes, StandardCharsets.UTF_8)
                     val cmd = JamCommand.fromJson(jsonStr)
                     if (cmd.action == JamAction.FILE_INCOMING) {
                         pendingFileName = cmd.fileName
@@ -175,21 +175,31 @@ class JamManager(private val context: Context) {
                     }
                 }
                 Payload.Type.FILE -> {
-                    incomingFilePayloadId = payload.id
+                    incomingPayload = payload
                 }
             }
         }
 
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
-            if (update.payloadId == incomingFilePayloadId && update.status == PayloadTransferUpdate.Status.SUCCESS) {
-                // File payload finished receiving into cache
-                val payload = connectionsClient.getPayload(incomingFilePayloadId!!)
-                val javaFile = payload?.asFile()?.asJavaFile()
+            if (incomingPayload != null && update.payloadId == incomingPayload?.id &&
+                update.status == PayloadTransferUpdate.Status.SUCCESS
+            ) {
+                val javaFile = incomingPayload?.asFile()?.asJavaFile()
                 if (javaFile != null) {
                     val targetFile = File(context.cacheDir, pendingFileName)
-                    javaFile.renameTo(targetFile)
-                    onAudioFileReceived?.invoke(targetFile)
+                    try {
+                        FileInputStream(javaFile).use { input ->
+                            FileOutputStream(targetFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        javaFile.delete()
+                        onAudioFileReceived?.invoke(targetFile)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
+                incomingPayload = null
             }
         }
     }
