@@ -2,6 +2,8 @@ package com.dn0ne.player.jam
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.widget.Toast
 import com.google.android.gms.nearby.Nearby
@@ -24,6 +26,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 
 class JamManager(private val context: Context) {
 
@@ -43,7 +46,7 @@ class JamManager(private val context: Context) {
     var onCommandReceived: ((JamCommand) -> Unit)? = null
     var onAudioFileReceived: ((File) -> Unit)? = null
 
-    private var incomingPayload: Payload? = null
+    private val incomingFilePayloads = ConcurrentHashMap<Long, Payload>()
     private var pendingFileName: String = "temp_jam_audio.mp3"
 
     fun startHosting(hostName: String) {
@@ -163,35 +166,52 @@ class JamManager(private val context: Context) {
                     if (cmd.action == JamAction.FILE_INCOMING) {
                         pendingFileName = cmd.fileName
                     } else {
-                        onCommandReceived?.invoke(cmd)
+                        Handler(Looper.getMainLooper()).post {
+                            onCommandReceived?.invoke(cmd)
+                        }
                     }
                 }
                 Payload.Type.FILE -> {
-                    incomingPayload = payload
+                    incomingFilePayloads[payload.id] = payload
                 }
             }
         }
 
         override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
-            if (incomingPayload != null && update.payloadId == incomingPayload?.id &&
-                update.status == PayloadTransferUpdate.Status.SUCCESS
-            ) {
-                val javaFile = incomingPayload?.asFile()?.asJavaFile()
-                if (javaFile != null) {
-                    val targetFile = File(context.cacheDir, pendingFileName)
-                    try {
-                        FileInputStream(javaFile).use { input ->
+            if (update.status == PayloadTransferUpdate.Status.SUCCESS) {
+                val payload = incomingFilePayloads.remove(update.payloadId) ?: return
+
+                val targetFile = File(context.cacheDir, pendingFileName)
+                try {
+                    val pfd = payload.asFile()?.asParcelFileDescriptor()
+                    if (pfd != null) {
+                        FileInputStream(pfd.fileDescriptor).use { input ->
                             FileOutputStream(targetFile).use { output ->
                                 input.copyTo(output)
                             }
                         }
-                        javaFile.delete()
-                        onAudioFileReceived?.invoke(targetFile)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                        pfd.close()
+                    } else {
+                        val javaFile = payload.asFile()?.asJavaFile()
+                        if (javaFile != null) {
+                            FileInputStream(javaFile).use { input ->
+                                FileOutputStream(targetFile).use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            javaFile.delete()
+                        }
                     }
+
+                    Handler(Looper.getMainLooper()).post {
+                        onAudioFileReceived?.invoke(targetFile)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                incomingPayload = null
+            } else if (update.status == PayloadTransferUpdate.Status.FAILURE ||
+                       update.status == PayloadTransferUpdate.Status.CANCELED) {
+                incomingFilePayloads.remove(update.payloadId)
             }
         }
     }
