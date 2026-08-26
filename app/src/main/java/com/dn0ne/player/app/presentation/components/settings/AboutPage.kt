@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.QuestionAnswer
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.AlertDialog
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.lerp
 import com.dn0ne.player.R
 import com.dn0ne.player.app.presentation.components.topbar.ColumnWithCollapsibleTopBar
 import com.dn0ne.player.core.presentation.AppDetails
+import com.dn0ne.player.jam.JamDialog
+import com.dn0ne.player.jam.JamManager
 import com.dn0ne.player.updater.GitHubUpdater
 import kotlinx.coroutines.launch
 
@@ -55,6 +58,9 @@ fun AboutPage(
     var updateAvailable by remember { mutableStateOf(false) }
     var latestUrl by remember { mutableStateOf("") }
     var newVersionName by remember { mutableStateOf("") }
+
+    val jamManager = remember { JamManager(context) }
+    var showJamDialog by remember { mutableStateOf(false) }
 
     ColumnWithCollapsibleTopBar(
         topBarContent = {
@@ -104,6 +110,14 @@ fun AboutPage(
         SettingsGroup(
             items = listOf(
                 SettingsItem(
+                    title = "Shankhanaad",
+                    supportingText = "Resonate together with nearby friends offline",
+                    icon = Icons.Rounded.Group,
+                    onClick = {
+                        showJamDialog = true
+                    }
+                ),
+                SettingsItem(
                     title = "Check for updates",
                     supportingText = "Fetch the latest release from GitHub",
                     icon = Icons.Rounded.SystemUpdate,
@@ -137,6 +151,13 @@ fun AboutPage(
                     }
                 )
             )
+        )
+    }
+
+    if (showJamDialog) {
+        JamDialog(
+            jamManager = jamManager,
+            onDismissRequest = { showJamDialog = false }
         )
     }
 
