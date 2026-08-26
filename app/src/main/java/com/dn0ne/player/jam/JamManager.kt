@@ -40,7 +40,6 @@ class JamManager(private val context: Context) {
     private val _discoveredHosts = MutableStateFlow<List<DiscoveredHost>>(emptyList())
     val discoveredHosts: StateFlow<List<DiscoveredHost>> = _discoveredHosts.asStateFlow()
 
-    // Callbacks for media player events
     var onCommandReceived: ((JamCommand) -> Unit)? = null
     var onAudioFileReceived: ((File) -> Unit)? = null
 
