@@ -61,12 +61,7 @@ fun JamDialog(
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { results ->
-        val allGranted = results.values.all { it }
-        if (allGranted) {
-            // Permissions granted
-        }
-    }
+    ) { _ -> }
 
     fun checkAndRun(action: () -> Unit) {
         val missingPermissions = permissionsToRequest.filter {
@@ -82,10 +77,10 @@ fun JamDialog(
     AlertDialog(
         onDismissRequest = onDismissRequest,
         icon = {
-            Icon(imageVector = Icons.Rounded.Group, contentDescription = "Jam Session")
+            Icon(imageVector = Icons.Rounded.Group, contentDescription = "Shankhanaad")
         },
         title = {
-            Text(text = "Local Jam Session")
+            Text(text = "Shankhanaad")
         },
         text = {
             Column(
@@ -95,7 +90,7 @@ fun JamDialog(
                 when (currentRole) {
                     JamRole.NONE -> {
                         Text(
-                            text = "Listen together with nearby friends without using mobile data.",
+                            text = "Play songs in unison with nearby friends over Bluetooth & Wi-Fi Direct without using mobile data.",
                             style = MaterialTheme.typography.bodyMedium
                         )
 
@@ -111,7 +106,7 @@ fun JamDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Rounded.Radio, contentDescription = null)
-                            Text(text = "Start Jam (Host)", modifier = Modifier.padding(start = 8.dp))
+                            Text(text = "Sound the Shankhanaad (Host)", modifier = Modifier.padding(start = 8.dp))
                         }
 
                         OutlinedButton(
@@ -123,17 +118,17 @@ fun JamDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Rounded.Bluetooth, contentDescription = null)
-                            Text(text = "Join Jam (Friend)", modifier = Modifier.padding(start = 8.dp))
+                            Text(text = "Tune In (Friend)", modifier = Modifier.padding(start = 8.dp))
                         }
                     }
 
                     JamRole.HOST -> {
                         Text(
-                            text = "Hosting Jam as: ${Build.MODEL}",
+                            text = "Broadcasting as: ${Build.MODEL}",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Connected Friends: ${connectedPeers.size}",
+                            text = "Tuned-in Friends: ${connectedPeers.size}",
                             style = MaterialTheme.typography.bodyMedium
                         )
 
@@ -143,26 +138,26 @@ fun JamDialog(
                             modifier = Modifier.padding(vertical = 8.dp)
                         ) {
                             CircularProgressIndicator(modifier = Modifier.height(20.dp))
-                            Text("Broadcasting session...", style = MaterialTheme.typography.bodySmall)
+                            Text("Awaiting friends to join...", style = MaterialTheme.typography.bodySmall)
                         }
 
                         Button(
                             onClick = { jamManager.stopJam() },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Stop Jam")
+                            Text("End Shankhanaad")
                         }
                     }
 
                     JamRole.GUEST -> {
                         Text(
-                            text = "Searching for nearby Jams...",
+                            text = "Searching for nearby Shankhanaad sessions...",
                             style = MaterialTheme.typography.bodyMedium
                         )
 
                         if (connectedPeers.isNotEmpty()) {
                             Text(
-                                text = "Connected to Jam session!",
+                                text = "Connected & in tune! Waiting for host to play...",
                                 color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.titleSmall
                             )
@@ -173,7 +168,7 @@ fun JamDialog(
                                 modifier = Modifier.padding(vertical = 8.dp)
                             ) {
                                 CircularProgressIndicator(modifier = Modifier.height(20.dp))
-                                Text("Looking for hosts...", style = MaterialTheme.typography.bodySmall)
+                                Text("Searching...", style = MaterialTheme.typography.bodySmall)
                             }
                         } else {
                             LazyColumn(
@@ -191,7 +186,7 @@ fun JamDialog(
                                     ) {
                                         Column(modifier = Modifier.padding(12.dp)) {
                                             Text(text = host.endpointName, style = MaterialTheme.typography.titleSmall)
-                                            Text(text = "Tap to connect", style = MaterialTheme.typography.bodySmall)
+                                            Text(text = "Tap to tune in", style = MaterialTheme.typography.bodySmall)
                                         }
                                     }
                                 }
