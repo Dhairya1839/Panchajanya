@@ -10,6 +10,9 @@ dependencies {
     // Jetpack Glance for Home Screen Widgets
     implementation("androidx.glance:glance-appwidget:1.1.0")
     implementation("androidx.glance:glance-material3:1.1.0")
+    // Google Nearby Connections for Local Jam
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
+
 }
 
 
