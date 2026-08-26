@@ -23,8 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
@@ -100,8 +100,8 @@ class JamManager(private val context: Context) {
             sendCommand(JamCommand(action = JamAction.FILE_INCOMING, fileName = fileName))
 
             val pfd: ParcelFileDescriptor? = context.contentResolver.openFileDescriptor(uri, "r")
-            pfd?.let {
-                val filePayload = Payload.fromFile(it)
+            if (pfd != null) {
+                val filePayload = Payload.fromFile(pfd)
                 val peers = _connectedPeers.value
                 if (peers.isNotEmpty()) {
                     connectionsClient.sendPayload(peers, filePayload)
@@ -183,28 +183,27 @@ class JamManager(private val context: Context) {
 
                 val targetFile = File(context.cacheDir, pendingFileName)
                 try {
-                    val pfd = payload.asFile()?.asParcelFileDescriptor()
-                    if (pfd != null) {
-                        FileInputStream(pfd.fileDescriptor).use { input ->
+                    // Method 1: Handle Uri Payload (Standard for Android 10+)
+                    val uri = payload.asFile()?.asUri()
+                    if (uri != null) {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
                             FileOutputStream(targetFile).use { output ->
                                 input.copyTo(output)
                             }
                         }
-                        pfd.close()
                     } else {
+                        // Method 2: Handle Java File Payload
                         val javaFile = payload.asFile()?.asJavaFile()
-                        if (javaFile != null) {
-                            FileInputStream(javaFile).use { input ->
-                                FileOutputStream(targetFile).use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
+                        if (javaFile != null && javaFile.exists()) {
+                            javaFile.copyTo(targetFile, overwrite = true)
                             javaFile.delete()
                         }
                     }
 
-                    Handler(Looper.getMainLooper()).post {
-                        onAudioFileReceived?.invoke(targetFile)
+                    if (targetFile.exists() && targetFile.length() > 0) {
+                        Handler(Looper.getMainLooper()).post {
+                            onAudioFileReceived?.invoke(targetFile)
+                        }
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
