@@ -108,7 +108,6 @@ import com.dn0ne.player.app.presentation.components.topbar.TopBarContent
 import com.dn0ne.player.app.presentation.components.trackList
 import com.dn0ne.player.app.presentation.components.trackinfo.SearchField
 import com.dn0ne.player.app.presentation.components.trackinfo.TrackInfoSheet
-import com.dnone.player.VoiceControlSettingsTile
 import com.kmpalette.color
 import com.kmpalette.rememberDominantColorState
 import com.materialkolor.DynamicMaterialTheme
@@ -718,14 +717,7 @@ fun PlayerScreen(
                     val isPlayerExpanded by remember {
                         derivedStateOf { playbackState.isPlayerExpanded }
                     }
-
                     if (!isPlayerExpanded) {
-                        VoiceControlSettingsTile(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp)
-                        )
-
                         ScrollToTopAndLocateButtons(
                             showScrollToTopButton = showScrollToTopButton,
                             onScrollToTopClick = onScrollToTopClick,
