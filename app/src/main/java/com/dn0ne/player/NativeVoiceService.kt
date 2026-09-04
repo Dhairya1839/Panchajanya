@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -18,6 +19,7 @@ import android.provider.MediaStore
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
@@ -43,53 +45,102 @@ class NativeVoiceService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        startForeground(NOTIFICATION_ID, buildListeningNotification())
-        setupSpeechRecognizer()
-        startListening()
+        initForegroundNotification()
+        mainHandler.postDelayed({
+            setupSpeechRecognizer()
+            startListening()
+        }, 500)
+    }
+
+    private fun initForegroundNotification() {
+        val channelId = "panchajanya_voice_channel"
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Panchajanya Offline Voice",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Keeps voice listener active for Hey Panch commands"
+            }
+            manager.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Panchajanya Voice Active")
+            .setContentText("Listening for 'Hey Panch play [song]'")
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun setupSpeechRecognizer() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Log.e("NativeVoiceService", "Speech recognition unavailable on this device")
             stopSelf()
             return
         }
 
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        destroyRecognizer()
+
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
+            setRecognitionListener(object : RecognitionListener {
+                override fun onPartialResults(partialResults: Bundle?) {
+                    evaluateSpokenInput(partialResults)
+                }
+
+                override fun onResults(results: Bundle?) {
+                    evaluateSpokenInput(results)
+                    restartListeningWithDelay()
+                }
+
+                override fun onError(error: Int) {
+                    Log.d("NativeVoiceService", "SpeechRecognizer error: $error")
+                    // Auto-restart on timeout, no match, or silence
+                    restartListeningWithDelay()
+                }
+
+                override fun onReadyForSpeech(params: Bundle?) {
+                    Log.d("NativeVoiceService", "Mic ready for speech")
+                }
+
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
 
         recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
         }
-
-        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onPartialResults(partialResults: Bundle?) {
-                evaluateSpokenInput(partialResults)
-            }
-
-            override fun onResults(results: Bundle?) {
-                evaluateSpokenInput(results)
-                restartListeningWithDelay()
-            }
-
-            override fun onError(error: Int) {
-                // Instantly re-arm on silence, speech pauses, or timeouts
-                restartListeningWithDelay()
-            }
-
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
     }
 
     private fun evaluateSpokenInput(bundle: Bundle?) {
         val matches = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         val text = matches?.firstOrNull()?.lowercase()?.trim() ?: return
+
+        Log.d("NativeVoiceService", "Heard text: $text")
 
         // Matches: "hey panch play [song]", "panch play [song]", or "play [song]"
         val triggerRegex = Regex("^(hey\\s+panch|panch|play)\\s*(.*)")
@@ -100,7 +151,6 @@ class NativeVoiceService : Service() {
             val targetSong = extractedQuery.replace("^(play|music|song)\\s*".toRegex(), "").trim()
 
             if (targetSong.isNotEmpty()) {
-                // Pause mic listening before executing audio playback
                 pauseListening()
                 findAndPlayDownloadedSong(targetSong)
             }
@@ -123,12 +173,11 @@ class NativeVoiceService : Service() {
                 } else {
                     Toast.makeText(
                         applicationContext,
-                        "No local download found for '$songQuery'",
+                        "No local audio found for '$songQuery'",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
 
-                // Resume voice listener
                 restartListeningWithDelay()
             }
         }
@@ -147,7 +196,6 @@ class NativeVoiceService : Service() {
             MediaStore.Audio.Media.ARTIST
         )
 
-        // Strict search across local MP3/M4A/FLAC files on device storage
         val selection = "(${MediaStore.Audio.Media.TITLE} LIKE ? OR ${MediaStore.Audio.Media.ARTIST} LIKE ?) AND ${MediaStore.Audio.Media.IS_MUSIC} != 0"
         val selectionArgs = arrayOf("%$query%", "%$query%")
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
@@ -184,52 +232,58 @@ class NativeVoiceService : Service() {
     }
 
     private fun startListening() {
-        if (!isListening) {
+        if (!isListening && speechRecognizer != null && recognizerIntent != null) {
             isListening = true
-            speechRecognizer?.startListening(recognizerIntent)
+            mainHandler.post {
+                try {
+                    speechRecognizer?.startListening(recognizerIntent)
+                } catch (e: Exception) {
+                    Log.e("NativeVoiceService", "Start listening error: ${e.message}")
+                    isListening = false
+                }
+            }
         }
     }
 
     private fun restartListeningWithDelay() {
         isListening = false
-        speechRecognizer?.cancel()
-        // 250ms debounce prevents speech server error loops on rapid restarts
+        mainHandler.post {
+            try {
+                speechRecognizer?.cancel()
+            } catch (e: Exception) {
+                Log.e("NativeVoiceService", "Cancel error: ${e.message}")
+            }
+        }
         mainHandler.postDelayed({
             startListening()
-        }, 250)
+        }, 350)
     }
 
     private fun pauseListening() {
         isListening = false
-        speechRecognizer?.stopListening()
-        speechRecognizer?.cancel()
+        mainHandler.post {
+            try {
+                speechRecognizer?.stopListening()
+                speechRecognizer?.cancel()
+            } catch (e: Exception) {
+                Log.e("NativeVoiceService", "Pause error: ${e.message}")
+            }
+        }
     }
 
-    private fun buildListeningNotification(): Notification {
-        val channelId = "panchajanya_voice_channel"
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Panchajanya Offline Voice",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            manager.createNotificationChannel(channel)
+    private fun destroyRecognizer() {
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e("NativeVoiceService", "Destroy error: ${e.message}")
         }
-
-        return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Panchajanya Voice Active")
-            .setContentText("Say 'Hey Panch play [song]'")
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setOngoing(true)
-            .build()
+        speechRecognizer = null
     }
 
     override fun onDestroy() {
         isListening = false
         mainHandler.removeCallbacksAndMessages(null)
-        speechRecognizer?.destroy()
+        destroyRecognizer()
         super.onDestroy()
     }
 
