@@ -5,12 +5,8 @@
     <!-- Foreground Services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-
-    <!-- Microphone -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Storage Access -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -37,13 +33,6 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
-
-    <!-- Mandatory for SpeechRecognizer on Android 11+ -->
-    <queries>
-        <intent>
-            <action android:name="android.speech.RecognitionService" />
-        </intent>
-    </queries>
 
     <application
         android:name=".PlayerApp"
@@ -98,13 +87,6 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
-
-        <!-- Explicit package path prevents ClassNotFoundException -->
-        <service
-            android:name="com.dnone.player.NativeVoiceService"
-            android:foregroundServiceType="microphone"
-            android:enabled="true"
-            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
