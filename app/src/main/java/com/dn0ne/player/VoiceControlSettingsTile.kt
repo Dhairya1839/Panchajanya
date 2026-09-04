@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,18 +33,33 @@ import androidx.core.content.ContextCompat
 @Composable
 fun VoiceControlSettingsTile(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    var isEnabled by remember { mutableStateOf(NativeVoiceService.isRunning(context)) }
+    var isEnabled by remember { mutableStateOf(false) }
+
+    // Sync state on load
+    LaunchedEffect(Unit) {
+        isEnabled = NativeVoiceService.isRunning(context)
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
-        if (recordAudioGranted) {
+        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions[Manifest.permission.POST_NOTIFICATIONS] == true
+        } else {
+            true
+        }
+
+        if (recordAudioGranted && notificationGranted) {
             startVoiceService(context)
             isEnabled = true
         } else {
             isEnabled = false
-            Toast.makeText(context, "Microphone permission is required for voice control", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                "Microphone and Notification permissions are required",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -76,11 +92,11 @@ fun VoiceControlSettingsTile(modifier: Modifier = Modifier) {
                         permissionsNeeded.add(Manifest.permission.POST_NOTIFICATIONS)
                     }
 
-                    val hasPermissions = permissionsNeeded.all {
+                    val allGranted = permissionsNeeded.all {
                         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
                     }
 
-                    if (hasPermissions) {
+                    if (allGranted) {
                         startVoiceService(context)
                         isEnabled = true
                     } else {
@@ -96,15 +112,19 @@ fun VoiceControlSettingsTile(modifier: Modifier = Modifier) {
 }
 
 private fun startVoiceService(context: Context) {
-    val intent = Intent(context, NativeVoiceService::class.java)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        context.startForegroundService(intent)
-    } else {
-        context.startService(intent)
+    try {
+        val intent = Intent(context, NativeVoiceService::class.java)
+        ContextCompat.startForegroundService(context, intent)
+    } catch (e: Exception) {
+        Toast.makeText(context, "Failed to start voice service: ${e.message}", Toast.LENGTH_SHORT).show()
     }
 }
 
 private fun stopVoiceService(context: Context) {
-    val intent = Intent(context, NativeVoiceService::class.java)
-    context.stopService(intent)
+    try {
+        val intent = Intent(context, NativeVoiceService::class.java)
+        context.stopService(intent)
+    } catch (e: Exception) {
+        // Ignored
+    }
 }
