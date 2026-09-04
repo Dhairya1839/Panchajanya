@@ -8,10 +8,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Microphone -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -25,7 +21,7 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
         android:maxSdkVersion="29" />
 
-    <!-- Network -->
+    <!-- Network & APK Updates -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
@@ -41,6 +37,13 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Mandatory for SpeechRecognizer on Android 11+ -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".PlayerApp"
@@ -96,10 +99,11 @@
             </intent-filter>
         </service>
 
-        <!-- Panchajanya Voice Listener Service -->
+        <!-- Explicit package path prevents ClassNotFoundException -->
         <service
-            android:name=".NativeVoiceService"
+            android:name="com.dnone.player.NativeVoiceService"
             android:foregroundServiceType="microphone"
+            android:enabled="true"
             android:exported="false" />
 
         <provider
