@@ -209,6 +209,7 @@ class EqualizerController(context: Context) {
 
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
+    private lateinit var autoVolumeManager: AutoVolumeManager
     private val equalizerController = get<EqualizerController>()
 
     override fun onCreate() {
@@ -256,6 +257,11 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
             .build()
+    }
+
+    override fun onCreate() {
+    super.onCreate()
+    autoVolumeManager = AutoVolumeManager(this)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
