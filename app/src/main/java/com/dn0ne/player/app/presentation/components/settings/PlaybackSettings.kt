@@ -1,5 +1,11 @@
 package com.dn0ne.player.app.presentation.components.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.FilterCenterFocus
@@ -33,6 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.fastForEachIndexed
+import androidx.core.content.ContextCompat
+import com.dn0ne.player.AutoVolumePreferences
 import com.dn0ne.player.EqualizerController
 import com.dn0ne.player.R
 import com.dn0ne.player.app.presentation.components.snackbar.SnackbarController
@@ -51,6 +60,28 @@ fun PlaybackSettings(
     val context = LocalContext.current
     var collapseFraction by remember {
         mutableFloatStateOf(0f)
+    }
+
+    var isAutoVolumeEnabled by remember {
+        mutableStateOf(AutoVolumePreferences.isEnabled(context))
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
+        if (recordAudioGranted) {
+            isAutoVolumeEnabled = true
+            AutoVolumePreferences.setEnabled(context, true)
+        } else {
+            isAutoVolumeEnabled = false
+            AutoVolumePreferences.setEnabled(context, false)
+            Toast.makeText(
+                context,
+                "Microphone permission is required to detect ambient noise",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     ColumnWithCollapsibleTopBar(
@@ -145,6 +176,36 @@ fun PlaybackSettings(
                     .fillMaxWidth()
             )
         }
+
+        SettingSwitch(
+            title = "Adaptive volume",
+            supportingText = "Automatically adjusts volume to surrounding noise when Bluetooth is connected",
+            icon = Icons.AutoMirrored.Rounded.VolumeUp,
+            isChecked = isAutoVolumeEnabled,
+            onCheckedChange = { targetState ->
+                if (targetState) {
+                    val permissionsNeeded = mutableListOf(Manifest.permission.RECORD_AUDIO)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        permissionsNeeded.add(Manifest.permission.BLUETOOTH_CONNECT)
+                    }
+
+                    val allGranted = permissionsNeeded.all {
+                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                    }
+
+                    if (allGranted) {
+                        isAutoVolumeEnabled = true
+                        AutoVolumePreferences.setEnabled(context, true)
+                    } else {
+                        permissionLauncher.launch(permissionsNeeded.toTypedArray())
+                    }
+                } else {
+                    isAutoVolumeEnabled = false
+                    AutoVolumePreferences.setEnabled(context, false)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
