@@ -17,7 +17,7 @@ import kotlin.math.abs
 enum class TorchSyncMode {
     OFF,
     DISCO,   // Sharp On / Off beat pulse
-    FADE     // Smooth brightness modulation (Android 13+) or rhythmic pulse
+    FADE     // Smooth brightness modulation (API 33+) or smoothed strobe fallback
 }
 
 class TorchSyncManager(private val context: Context) {
@@ -35,7 +35,7 @@ class TorchSyncManager(private val context: Context) {
     private var currentMode = TorchSyncMode.OFF
 
     @Volatile
-    private var energyLevel = 0f
+    private var energyLevel = 0f // 0.0 to 1.0 based on music energy
 
     init {
         findBackCameraWithFlash()
@@ -70,10 +70,12 @@ class TorchSyncManager(private val context: Context) {
 
         try {
             visualizer = Visualizer(audioSessionId).apply {
-                captureSize = Visualizer.getCaptureSizeRange()[0]
+                captureSize = Visualizer.getCaptureSizeRange()[0] // Minimal size for fast low-latency response
                 setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                     override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {
-                        waveform?.let { computeWaveformEnergy(it) }
+                        waveform?.let {
+                            computeWaveformEnergy(it)
+                        }
                     }
 
                     override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {}
@@ -86,10 +88,12 @@ class TorchSyncManager(private val context: Context) {
     private fun computeWaveformEnergy(waveform: ByteArray) {
         var sum = 0.0
         for (sample in waveform) {
+            // Unsigned 8-bit to signed PCM (-128 to 127)
             val pcm = (sample.toInt() and 0xFF) - 128
             sum += abs(pcm)
         }
         val avg = sum / waveform.size
+        // Normalize 0.0 to 1.0 (typical peak speech/music hits 35-70 avg)
         energyLevel = (avg / 60.0).toFloat().coerceIn(0f, 1f)
     }
 
@@ -114,14 +118,16 @@ class TorchSyncManager(private val context: Context) {
 
                 when (currentMode) {
                     TorchSyncMode.DISCO -> {
+                        // Strobe beat detection
                         val shouldTurnOn = energyLevel > 0.45f
                         try {
                             cameraManager.setTorchMode(camId, shouldTurnOn)
                         } catch (_: Exception) {}
-                        delay(60)
+                        delay(60) // Strobe tick interval
                     }
 
                     TorchSyncMode.FADE -> {
+                        // Smoothly interpolate energy for a fade in / fade out effect
                         smoothedFade += (energyLevel - smoothedFade) * 0.35f
 
                         if (supportsStrengthControl && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -133,8 +139,9 @@ class TorchSyncManager(private val context: Context) {
                                     cameraManager.setTorchMode(camId, false)
                                 }
                             } catch (_: Exception) {}
-                            delay(40)
+                            delay(40) // Fast 25fps refresh for smooth fading
                         } else {
+                            // Fallback for hardware without multi-level brightness: rhythmic pulsing
                             val isPulseOn = smoothedFade > 0.35f
                             try {
                                 cameraManager.setTorchMode(camId, isPulseOn)
