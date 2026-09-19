@@ -185,7 +185,7 @@ fun PlaybackSettings(
 
         SettingSwitch(
             title = "Adaptive volume",
-            supportingText = "Automatically adjusts volume to surrounding noise when Bluetooth is connected",
+            supportingText = "Automatically adjusts volume to surrounding noise when Bluetooth is connected (25% - 50%)",
             icon = Icons.AutoMirrored.Rounded.VolumeUp,
             isChecked = isAutoVolumeEnabled,
             onCheckedChange = { targetState ->
