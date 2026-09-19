@@ -16,9 +16,6 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
-    <!-- Nothing Glyph SDK Permission -->
-    <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
-
     <!-- Storage Access -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission 
@@ -44,11 +41,6 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
-
-    <!-- Package Visibility for Nothing OS Glyph Service -->
-    <queries>
-        <package android:name="com.nothing.glyph" />
-    </queries>
 
     <application
         android:name=".PlayerApp"
