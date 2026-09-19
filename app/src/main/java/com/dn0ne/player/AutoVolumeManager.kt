@@ -31,7 +31,6 @@ class AutoVolumeManager(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("panchajanya_audio_settings", Context.MODE_PRIVATE)
 
-    // Listen directly to switch changes so turning off the switch stops the service instantly
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "auto_volume_enabled") {
             val enabled = AutoVolumePreferences.isEnabled(context)
@@ -83,7 +82,6 @@ class AutoVolumeManager(private val context: Context) {
             audioRecord.startRecording()
 
             while (isRunning && kotlinx.coroutines.currentCoroutineContext().isActive) {
-                // Exit immediately if toggled off or Bluetooth dropped
                 if (!AutoVolumePreferences.isEnabled(context) || !isBluetoothOutputConnected()) {
                     break
                 }
@@ -119,14 +117,14 @@ class AutoVolumeManager(private val context: Context) {
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
 
-        // Strict clamps: Minimum 25%, Maximum 50%
-        val minVol = (maxVolume * 0.25).toInt().coerceAtLeast(1)
+        val minVol = (maxVolume * 0.20).toInt().coerceAtLeast(1)
+        val modVol = (maxVolume * 0.27).toInt().coerceAtLeast(1)
         val maxVol = (maxVolume * 0.50).toInt()
 
         val targetVolumeLevel = when {
-            db < 52 -> minVol                                  // Quiet -> 25%
-            db < 66 -> ((minVol + maxVol) / 2)                // Moderate noise -> ~37.5%
-            else    -> maxVol                                 // Loud noise -> Capped strictly at 50%
+            db < 52 -> minVol   // Quiet -> 20%
+            db < 66 -> modVol   // Moderate noise -> 27%
+            else    -> maxVol   // Loud noise -> 50%
         }.coerceIn(minVol, maxVol)
 
         if (abs(targetVolumeLevel - currentVolume) >= 1) {
