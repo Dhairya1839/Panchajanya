@@ -215,6 +215,8 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
+        autoVolumeManager = AutoVolumeManager(this)
+
         val shouldHandleAudioFocus = get<Settings>().handleAudioFocus
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -235,6 +237,14 @@ class PlaybackService : MediaSessionService() {
                     if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
                         equalizerController.updateEqualizer(audioSessionId)
                     }
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying && AutoVolumePreferences.isEnabled(this@PlaybackService)) {
+                    autoVolumeManager.start()
+                } else {
+                    autoVolumeManager.stop()
                 }
             }
         })
@@ -259,11 +269,6 @@ class PlaybackService : MediaSessionService() {
             .build()
     }
 
-    override fun onCreate() {
-    super.onCreate()
-    autoVolumeManager = AutoVolumeManager(this)
-    }
-
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaSession?.player!!
 
@@ -276,6 +281,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        autoVolumeManager.stop()
         equalizerController.releaseEqualizer()
         SleepTimer.stop()
         mediaSession?.run {
@@ -288,7 +294,6 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
-
 }
 
 object SleepTimer {
