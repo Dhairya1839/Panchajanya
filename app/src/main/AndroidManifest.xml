@@ -5,8 +5,12 @@
     <!-- Foreground Services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Audio Recording for Adaptive Volume -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Storage Access -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -80,7 +84,7 @@
         <!-- Media3 Audio Playback Service -->
         <service 
             android:name=".PlaybackService"
-            android:foregroundServiceType="mediaPlayback"
+            android:foregroundServiceType="mediaPlayback|microphone"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
