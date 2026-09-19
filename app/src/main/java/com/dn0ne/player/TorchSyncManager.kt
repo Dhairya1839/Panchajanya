@@ -17,13 +17,12 @@ import kotlin.math.abs
 enum class TorchSyncMode {
     OFF,
     DISCO,   // Sharp On / Off beat pulse
-    FADE     // Smooth brightness modulation
+    FADE     // Smooth brightness modulation (Android 13+) or rhythmic pulse
 }
 
 class TorchSyncManager(private val context: Context) {
 
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-    private val glyphHelper = NothingGlyphHelper(context)
     private var cameraId: String? = null
 
     private var visualizer: Visualizer? = null
@@ -39,11 +38,7 @@ class TorchSyncManager(private val context: Context) {
     private var energyLevel = 0f
 
     init {
-        if (glyphHelper.isNothingPhone) {
-            glyphHelper.init()
-        } else {
-            findBackCameraWithFlash()
-        }
+        findBackCameraWithFlash()
     }
 
     private fun findBackCameraWithFlash() {
@@ -115,87 +110,64 @@ class TorchSyncManager(private val context: Context) {
             var smoothedFade = 0f
 
             while (isActive && currentMode != TorchSyncMode.OFF) {
-                if (glyphHelper.isNothingPhone) {
-                    // --- NOTHING PHONE GLYPH PATH ---
-                    when (currentMode) {
-                        TorchSyncMode.DISCO -> {
-                            val beatOn = energyLevel > 0.45f
-                            glyphHelper.setStrobe(beatOn)
-                            delay(60)
-                        }
-                        TorchSyncMode.FADE -> {
-                            smoothedFade += (energyLevel - smoothedFade) * 0.35f
-                            glyphHelper.setBrightness(smoothedFade)
-                            delay(40)
-                        }
-                        TorchSyncMode.OFF -> break
-                    }
-                } else {
-                    // --- STANDARD CAMERA FLASH PATH ---
-                    val camId = cameraId ?: break
+                val camId = cameraId ?: break
 
-                    when (currentMode) {
-                        TorchSyncMode.DISCO -> {
-                            val shouldTurnOn = energyLevel > 0.45f
+                when (currentMode) {
+                    TorchSyncMode.DISCO -> {
+                        val shouldTurnOn = energyLevel > 0.45f
+                        try {
+                            cameraManager.setTorchMode(camId, shouldTurnOn)
+                        } catch (_: Exception) {}
+                        delay(60)
+                    }
+
+                    TorchSyncMode.FADE -> {
+                        smoothedFade += (energyLevel - smoothedFade) * 0.35f
+
+                        if (supportsStrengthControl && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             try {
-                                cameraManager.setTorchMode(camId, shouldTurnOn)
+                                if (smoothedFade > 0.08f) {
+                                    val targetStrength = (smoothedFade * maxStrengthLevel).toInt().coerceIn(1, maxStrengthLevel)
+                                    cameraManager.turnOnTorchWithStrengthLevel(camId, targetStrength)
+                                } else {
+                                    cameraManager.setTorchMode(camId, false)
+                                }
                             } catch (_: Exception) {}
-                            delay(60)
+                            delay(40)
+                        } else {
+                            val isPulseOn = smoothedFade > 0.35f
+                            try {
+                                cameraManager.setTorchMode(camId, isPulseOn)
+                            } catch (_: Exception) {}
+                            delay(120)
                         }
-
-                        TorchSyncMode.FADE -> {
-                            smoothedFade += (energyLevel - smoothedFade) * 0.35f
-
-                            if (supportsStrengthControl && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                try {
-                                    if (smoothedFade > 0.08f) {
-                                        val targetStrength = (smoothedFade * maxStrengthLevel).toInt().coerceIn(1, maxStrengthLevel)
-                                        cameraManager.turnOnTorchWithStrengthLevel(camId, targetStrength)
-                                    } else {
-                                        cameraManager.setTorchMode(camId, false)
-                                    }
-                                } catch (_: Exception) {}
-                                delay(40)
-                            } else {
-                                val isPulseOn = smoothedFade > 0.35f
-                                try {
-                                    cameraManager.setTorchMode(camId, isPulseOn)
-                                } catch (_: Exception) {}
-                                delay(120)
-                            }
-                        }
-
-                        TorchSyncMode.OFF -> break
                     }
+
+                    TorchSyncMode.OFF -> break
                 }
             }
 
-            turnOffAll()
+            turnOffTorch()
         }
     }
 
     fun stop() {
         syncJob?.cancel()
         syncJob = null
-        turnOffAll()
+        turnOffTorch()
     }
 
-    private fun turnOffAll() {
-        if (glyphHelper.isNothingPhone) {
-            glyphHelper.turnOff()
-        } else {
-            cameraId?.let { id ->
-                try {
-                    cameraManager.setTorchMode(id, false)
-                } catch (_: Exception) {}
-            }
+    private fun turnOffTorch() {
+        cameraId?.let { id ->
+            try {
+                cameraManager.setTorchMode(id, false)
+            } catch (_: Exception) {}
         }
     }
 
     fun release() {
         stop()
         releaseVisualizer()
-        glyphHelper.release()
     }
 
     private fun releaseVisualizer() {
