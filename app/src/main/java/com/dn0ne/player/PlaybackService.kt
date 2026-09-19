@@ -3,6 +3,7 @@ package com.dn0ne.player
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.audiofx.Equalizer
@@ -210,12 +211,25 @@ class EqualizerController(context: Context) {
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private lateinit var autoVolumeManager: AutoVolumeManager
+    private lateinit var torchSyncManager: TorchSyncManager
     private val equalizerController = get<EqualizerController>()
+
+    private val torchPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "torch_sync_mode") {
+            val newMode = TorchSyncPreferences.getMode(this)
+            torchSyncManager.setMode(newMode)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
 
         autoVolumeManager = AutoVolumeManager(this)
+        torchSyncManager = TorchSyncManager(this)
+        torchSyncManager.setMode(TorchSyncPreferences.getMode(this))
+
+        val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
+        torchPrefs.registerOnSharedPreferenceChangeListener(torchPrefsListener)
 
         val shouldHandleAudioFocus = get<Settings>().handleAudioFocus
         val audioAttributes = AudioAttributes.Builder()
@@ -236,6 +250,7 @@ class PlaybackService : MediaSessionService() {
                     val audioSessionId = player.audioSessionId
                     if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
                         equalizerController.updateEqualizer(audioSessionId)
+                        torchSyncManager.attachAudioSession(audioSessionId)
                     }
                 }
             }
@@ -245,6 +260,12 @@ class PlaybackService : MediaSessionService() {
                     autoVolumeManager.start()
                 } else {
                     autoVolumeManager.stop()
+                }
+
+                if (!isPlaying) {
+                    torchSyncManager.stop()
+                } else {
+                    torchSyncManager.setMode(TorchSyncPreferences.getMode(this@PlaybackService))
                 }
             }
         })
@@ -281,6 +302,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
+        torchPrefs.unregisterOnSharedPreferenceChangeListener(torchPrefsListener)
+        torchSyncManager.release()
         autoVolumeManager.stop()
         equalizerController.releaseEqualizer()
         SleepTimer.stop()
