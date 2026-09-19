@@ -18,7 +18,7 @@ val splitApks = false
 val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';').orEmpty()
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
 
-// Read GitHub Actions run number if available, otherwise default to incremented base
+// Automated incremental versioning via GitHub Actions
 val githubRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
 val baseVersionCode = 1_002_000 + (githubRunNumber ?: 3)
 val baseVersionName = if (githubRunNumber != null) "1.2.$githubRunNumber" else "1.2.3"
@@ -46,7 +46,6 @@ android {
                 keyAlias = System.getenv("KEY_ALIAS") ?: "panchajanya"
                 keyPassword = System.getenv("KEY_PASSWORD") ?: "dummyPassword"
             } else {
-                // Fallback to debug keystore if release.jks isn't present
                 initWith(getByName("debug"))
             }
         }
@@ -118,8 +117,6 @@ tasks.withType<com.android.build.gradle.internal.tasks.CompileArtProfileTask> {
 }
 
 dependencies {
-    // Nothing Glyph Developer Kit
-    implementation("com.nothing.ketchum:glyph-sdk:1.1.2
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
