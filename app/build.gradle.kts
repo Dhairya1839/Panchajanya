@@ -118,6 +118,8 @@ tasks.withType<com.android.build.gradle.internal.tasks.CompileArtProfileTask> {
 }
 
 dependencies {
+    // Nothing Glyph Developer Kit
+    implementation("com.nothing.ketchum:glyph-sdk:1.1.2
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
