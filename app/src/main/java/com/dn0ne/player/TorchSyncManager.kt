@@ -5,7 +5,6 @@ import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.audiofx.Visualizer
-import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,8 +15,8 @@ import kotlin.math.abs
 
 enum class TorchSyncMode {
     OFF,
-    DISCO,   // Softened, dynamic beat pulse
-    FADE     // Continuous ambient wave glow
+    DISCO,   // Punchy, musical pulse with smooth beat-hold
+    FADE     // Slower, breathing ambient pulse
 }
 
 class TorchSyncManager(private val context: Context) {
@@ -27,9 +26,6 @@ class TorchSyncManager(private val context: Context) {
 
     private var visualizer: Visualizer? = null
     private var syncJob: Job? = null
-
-    private var maxStrengthLevel = 1
-    private var supportsStrengthControl = false
 
     @Volatile
     private var currentMode = TorchSyncMode.OFF
@@ -50,13 +46,6 @@ class TorchSyncManager(private val context: Context) {
 
                 if (hasFlash && facing == CameraCharacteristics.LENS_FACING_BACK) {
                     cameraId = id
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        val maxLevel = characteristics.get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) ?: 1
-                        if (maxLevel > 1) {
-                            maxStrengthLevel = maxLevel
-                            supportsStrengthControl = true
-                        }
-                    }
                     break
                 }
             }
@@ -90,8 +79,8 @@ class TorchSyncManager(private val context: Context) {
             sum += abs(pcm)
         }
         val avg = sum / waveform.size
-        // Calibrated sensitivity
-        energyLevel = (avg / 45.0).toFloat().coerceIn(0f, 1f)
+        // 0.0 to 1.0 energy normalization
+        energyLevel = (avg / 60.0).toFloat().coerceIn(0f, 1f)
     }
 
     fun setMode(mode: TorchSyncMode) {
@@ -108,8 +97,7 @@ class TorchSyncManager(private val context: Context) {
     private fun startLoop() {
         syncJob?.cancel()
         syncJob = CoroutineScope(Dispatchers.Default).launch {
-            var envelope = 0f
-            var lastStrengthSent = -1
+            var smoothedFade = 0f
             var isTorchOn = false
 
             while (isActive && currentMode != TorchSyncMode.OFF) {
@@ -117,75 +105,39 @@ class TorchSyncManager(private val context: Context) {
 
                 when (currentMode) {
                     TorchSyncMode.DISCO -> {
-                        // Attack & Decay smoothing
-                        if (energyLevel > envelope) {
-                            envelope = energyLevel
-                        } else {
-                            envelope *= 0.70f // Soft natural decay
-                        }
-
-                        if (supportsStrengthControl && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            if (envelope > 0.20f) {
-                                val targetStrength = (envelope * maxStrengthLevel).toInt().coerceIn(1, maxStrengthLevel)
-                                if (targetStrength != lastStrengthSent) {
-                                    try {
-                                        cameraManager.turnOnTorchWithStrengthLevel(camId, targetStrength)
-                                        lastStrengthSent = targetStrength
-                                        isTorchOn = true
-                                    } catch (_: Exception) {}
-                                }
-                            } else if (isTorchOn) {
+                        // Beat trigger with minimum hold-open time for a smooth light pulse
+                        if (energyLevel > 0.42f) {
+                            if (!isTorchOn) {
                                 try {
-                                    cameraManager.setTorchMode(camId, false)
-                                    lastStrengthSent = 0
-                                    isTorchOn = false
+                                    cameraManager.setTorchMode(camId, true)
+                                    isTorchOn = true
                                 } catch (_: Exception) {}
                             }
-                            delay(50) // 20 updates/sec to prevent camera driver locking
+                            // Dwell time: keeps the light lit smoothly through the beat peak
+                            delay(85)
                         } else {
-                            // Standard device path: comfortable beat threshold
-                            val shouldTurnOn = envelope > 0.40f
-                            if (shouldTurnOn != isTorchOn) {
-                                try {
-                                    cameraManager.setTorchMode(camId, shouldTurnOn)
-                                    isTorchOn = shouldTurnOn
-                                } catch (_: Exception) {}
-                            }
-                            delay(60)
-                        }
-                    }
-
-                    TorchSyncMode.FADE -> {
-                        envelope += (energyLevel - envelope) * 0.30f
-
-                        if (supportsStrengthControl && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            if (envelope > 0.10f) {
-                                val targetStrength = (envelope * maxStrengthLevel).toInt().coerceIn(1, maxStrengthLevel)
-                                if (targetStrength != lastStrengthSent) {
-                                    try {
-                                        cameraManager.turnOnTorchWithStrengthLevel(camId, targetStrength)
-                                        lastStrengthSent = targetStrength
-                                        isTorchOn = true
-                                    } catch (_: Exception) {}
-                                }
-                            } else if (isTorchOn) {
+                            if (isTorchOn) {
                                 try {
                                     cameraManager.setTorchMode(camId, false)
-                                    lastStrengthSent = 0
                                     isTorchOn = false
                                 } catch (_: Exception) {}
                             }
                             delay(50)
-                        } else {
-                            val isPulseOn = envelope > 0.32f
-                            if (isPulseOn != isTorchOn) {
-                                try {
-                                    cameraManager.setTorchMode(camId, isPulseOn)
-                                    isTorchOn = isPulseOn
-                                } catch (_: Exception) {}
-                            }
-                            delay(100)
                         }
+                    }
+
+                    TorchSyncMode.FADE -> {
+                        // Leaky integrator to create a soft, breathing swell
+                        smoothedFade += (energyLevel - smoothedFade) * 0.35f
+                        val shouldTurnOn = smoothedFade > 0.36f
+
+                        if (shouldTurnOn != isTorchOn) {
+                            try {
+                                cameraManager.setTorchMode(camId, shouldTurnOn)
+                                isTorchOn = shouldTurnOn
+                            } catch (_: Exception) {}
+                        }
+                        delay(110)
                     }
 
                     TorchSyncMode.OFF -> break
