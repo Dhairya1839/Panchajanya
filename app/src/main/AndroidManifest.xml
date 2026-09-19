@@ -12,6 +12,13 @@
     <!-- Audio Recording for Adaptive Volume -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Camera / Flashlight for Music Torch Sync -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+
+    <!-- Nothing Glyph SDK Permission -->
+    <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
+
     <!-- Storage Access -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission 
@@ -25,7 +32,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- Bluetooth Permissions for Device Discovery -->
+    <!-- Bluetooth Permissions for Device Discovery & Adaptive Volume -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
@@ -37,6 +44,11 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+
+    <!-- Package Visibility for Nothing OS Glyph Service -->
+    <queries>
+        <package android:name="com.nothing.glyph" />
+    </queries>
 
     <application
         android:name=".PlayerApp"
