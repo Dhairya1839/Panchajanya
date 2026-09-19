@@ -12,13 +12,16 @@ dependencies {
     implementation("androidx.glance:glance-material3:1.1.0")
     // Google Nearby Connections for Local Jam
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
-
 }
-
 
 val splitApks = false
 val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';').orEmpty()
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86" to 3, "x86_64" to 4)
+
+// Read GitHub Actions run number if available, otherwise default to incremented base
+val githubRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val baseVersionCode = 1_002_000 + (githubRunNumber ?: 3)
+val baseVersionName = if (githubRunNumber != null) "1.2.$githubRunNumber" else "1.2.3"
 
 android {
     namespace = "com.dn0ne.player"
@@ -28,10 +31,25 @@ android {
         applicationId = "com.dhairya.panchajanya"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1_002_002
-        versionName = "1.2.2"
+        versionCode = baseVersionCode
+        versionName = baseVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreFile = file("release.jks")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEY_STORE_PASSWORD") ?: "dummyPassword"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "panchajanya"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "dummyPassword"
+            } else {
+                // Fallback to debug keystore if release.jks isn't present
+                initWith(getByName("debug"))
+            }
+        }
     }
 
     androidComponents {
@@ -67,14 +85,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
     applicationVariants.all {
         outputs.all {
             (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "Panchjanya-${defaultConfig.versionName}-${name}.apk"
+                "Panchajanya-${defaultConfig.versionName}-${name}.apk"
         }
     }
 
@@ -100,7 +118,6 @@ tasks.withType<com.android.build.gradle.internal.tasks.CompileArtProfileTask> {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
