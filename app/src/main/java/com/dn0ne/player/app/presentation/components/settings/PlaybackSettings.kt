@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,8 +20,10 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.FilterCenterFocus
+import androidx.compose.material.icons.rounded.FlashlightOn
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +47,8 @@ import androidx.core.content.ContextCompat
 import com.dn0ne.player.AutoVolumePreferences
 import com.dn0ne.player.EqualizerController
 import com.dn0ne.player.R
+import com.dn0ne.player.TorchSyncMode
+import com.dn0ne.player.TorchSyncPreferences
 import com.dn0ne.player.app.presentation.components.snackbar.SnackbarController
 import com.dn0ne.player.app.presentation.components.snackbar.SnackbarEvent
 import com.dn0ne.player.app.presentation.components.topbar.ColumnWithCollapsibleTopBar
@@ -66,6 +71,10 @@ fun PlaybackSettings(
         mutableStateOf(AutoVolumePreferences.isEnabled(context))
     }
 
+    var currentTorchMode by remember {
+        mutableStateOf(TorchSyncPreferences.getMode(context))
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -85,6 +94,23 @@ fun PlaybackSettings(
             Toast.makeText(
                 context,
                 "Microphone and Bluetooth permissions are required for Adaptive Volume",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            currentTorchMode = TorchSyncMode.DISCO
+            TorchSyncPreferences.setMode(context, TorchSyncMode.DISCO)
+        } else {
+            currentTorchMode = TorchSyncMode.OFF
+            TorchSyncPreferences.setMode(context, TorchSyncMode.OFF)
+            Toast.makeText(
+                context,
+                "Camera permission is required for Torch Sync",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -185,7 +211,7 @@ fun PlaybackSettings(
 
         SettingSwitch(
             title = "Adaptive volume",
-            supportingText = "Automatically adjusts volume to surrounding noise when Bluetooth is connected (25% - 50%)",
+            supportingText = "Automatically adjusts volume to surrounding noise when Bluetooth is connected (20% - 50%)",
             icon = Icons.AutoMirrored.Rounded.VolumeUp,
             isChecked = isAutoVolumeEnabled,
             onCheckedChange = { targetState ->
@@ -212,6 +238,61 @@ fun PlaybackSettings(
             },
             modifier = Modifier.fillMaxWidth()
         )
+
+        SettingSwitch(
+            title = "Torch Music Sync",
+            supportingText = "Synchronizes the camera flashlight with the beat of the music",
+            icon = Icons.Rounded.FlashlightOn,
+            isChecked = currentTorchMode != TorchSyncMode.OFF,
+            onCheckedChange = { isChecked ->
+                if (isChecked) {
+                    val hasCameraPermission = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (hasCameraPermission) {
+                        currentTorchMode = TorchSyncMode.DISCO
+                        TorchSyncPreferences.setMode(context, TorchSyncMode.DISCO)
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                } else {
+                    currentTorchMode = TorchSyncMode.OFF
+                    TorchSyncPreferences.setMode(context, TorchSyncMode.OFF)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        AnimatedVisibility(
+            visible = currentTorchMode != TorchSyncMode.OFF
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FilterChip(
+                    selected = currentTorchMode == TorchSyncMode.DISCO,
+                    onClick = {
+                        currentTorchMode = TorchSyncMode.DISCO
+                        TorchSyncPreferences.setMode(context, TorchSyncMode.DISCO)
+                    },
+                    label = { Text("Disco (Strobe)") }
+                )
+
+                FilterChip(
+                    selected = currentTorchMode == TorchSyncMode.FADE,
+                    onClick = {
+                        currentTorchMode = TorchSyncMode.FADE
+                        TorchSyncPreferences.setMode(context, TorchSyncMode.FADE)
+                    },
+                    label = { Text("Fade (Glow)") }
+                )
+            }
+        }
     }
 }
 
