@@ -70,7 +70,13 @@ fun PlaybackSettings(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val recordAudioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
-        if (recordAudioGranted) {
+        val bluetoothGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions[Manifest.permission.BLUETOOTH_CONNECT] == true
+        } else {
+            true
+        }
+
+        if (recordAudioGranted && bluetoothGranted) {
             isAutoVolumeEnabled = true
             AutoVolumePreferences.setEnabled(context, true)
         } else {
@@ -78,7 +84,7 @@ fun PlaybackSettings(
             AutoVolumePreferences.setEnabled(context, false)
             Toast.makeText(
                 context,
-                "Microphone permission is required to detect ambient noise",
+                "Microphone and Bluetooth permissions are required for Adaptive Volume",
                 Toast.LENGTH_SHORT
             ).show()
         }
