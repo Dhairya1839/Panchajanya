@@ -2,6 +2,7 @@ package com.dn0ne.player
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.SharedPreferences
 import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -28,8 +29,25 @@ class AutoVolumeManager(private val context: Context) {
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
     private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
 
+    private val prefs = context.getSharedPreferences("panchajanya_audio_settings", Context.MODE_PRIVATE)
+
+    // Listen directly to switch changes so turning off the switch stops the service instantly
+    private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "auto_volume_enabled") {
+            val enabled = AutoVolumePreferences.isEnabled(context)
+            if (!enabled) {
+                stop()
+            }
+        }
+    }
+
+    init {
+        prefs.registerOnSharedPreferenceChangeListener(preferenceListener)
+    }
+
     fun start() {
         if (isRunning) return
+        if (!AutoVolumePreferences.isEnabled(context)) return
         if (!isBluetoothOutputConnected()) return
 
         isRunning = true
@@ -65,9 +83,9 @@ class AutoVolumeManager(private val context: Context) {
             audioRecord.startRecording()
 
             while (isRunning && kotlinx.coroutines.currentCoroutineContext().isActive) {
-                if (!isBluetoothOutputConnected()) {
-                    delay(2000)
-                    continue
+                // Exit immediately if toggled off or Bluetooth dropped
+                if (!AutoVolumePreferences.isEnabled(context) || !isBluetoothOutputConnected()) {
+                    break
                 }
 
                 val readCount = audioRecord.read(buffer, 0, buffer.size)
@@ -84,6 +102,7 @@ class AutoVolumeManager(private val context: Context) {
                 audioRecord?.stop()
                 audioRecord?.release()
             } catch (_: Exception) {}
+            isRunning = false
         }
     }
 
@@ -100,14 +119,17 @@ class AutoVolumeManager(private val context: Context) {
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
 
-        val targetVolumeLevel = when {
-            db < 52 -> (maxVolume * 0.40).toInt()
-            db < 66 -> (maxVolume * 0.60).toInt()
-            db < 78 -> (maxVolume * 0.75).toInt()
-            else    -> (maxVolume * 0.85).toInt()
-        }
+        // Strict clamps: Minimum 25%, Maximum 50%
+        val minVol = (maxVolume * 0.25).toInt().coerceAtLeast(1)
+        val maxVol = (maxVolume * 0.50).toInt()
 
-        if (abs(targetVolumeLevel - currentVolume) >= 2) {
+        val targetVolumeLevel = when {
+            db < 52 -> minVol                                  // Quiet -> 25%
+            db < 66 -> ((minVol + maxVol) / 2)                // Moderate noise -> ~37.5%
+            else    -> maxVol                                 // Loud noise -> Capped strictly at 50%
+        }.coerceIn(minVol, maxVol)
+
+        if (abs(targetVolumeLevel - currentVolume) >= 1) {
             audioManager.setStreamVolume(
                 AudioManager.STREAM_MUSIC,
                 targetVolumeLevel,
