@@ -14,8 +14,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.log10
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 class AutoVolumeManager(private val context: Context) {
@@ -30,6 +30,13 @@ class AutoVolumeManager(private val context: Context) {
     private val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
 
     private val prefs = context.getSharedPreferences("panchajanya_audio_settings", Context.MODE_PRIVATE)
+
+    // Baseline volume set by the user manually
+    private var userBaseVolumeStep = -1
+    private var lastAppliedVolumeStep = -1
+
+    // Smoothed ambient noise tracker
+    private var smoothedDb = 45.0
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "auto_volume_enabled") {
@@ -49,6 +56,10 @@ class AutoVolumeManager(private val context: Context) {
         if (!AutoVolumePreferences.isEnabled(context)) return
         if (!isBluetoothOutputConnected()) return
 
+        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        userBaseVolumeStep = currentVol
+        lastAppliedVolumeStep = currentVol
+
         isRunning = true
         recordingJob = CoroutineScope(Dispatchers.IO).launch {
             monitorAndAdjustLoop()
@@ -59,6 +70,8 @@ class AutoVolumeManager(private val context: Context) {
         isRunning = false
         recordingJob?.cancel()
         recordingJob = null
+        userBaseVolumeStep = -1
+        lastAppliedVolumeStep = -1
     }
 
     @SuppressLint("MissingPermission")
@@ -86,13 +99,21 @@ class AutoVolumeManager(private val context: Context) {
                     break
                 }
 
-                val readCount = audioRecord.read(buffer, 0, buffer.size)
-                if (readCount > 0) {
-                    val db = calculateDecibels(buffer, readCount)
-                    adjustVolumeForDecibels(db)
+                // Detect manual user button presses (volume rocker)
+                val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                if (currentVol != lastAppliedVolumeStep) {
+                    userBaseVolumeStep = currentVol
+                    lastAppliedVolumeStep = currentVol
                 }
 
-                delay(2000)
+                val readCount = audioRecord.read(buffer, 0, buffer.size)
+                if (readCount > 0) {
+                    val instantDb = calculateDecibels(buffer, readCount)
+                    smoothedDb = (smoothedDb * 0.70) + (instantDb * 0.30)
+                    adjustRelativeVolume(smoothedDb)
+                }
+
+                delay(400)
             }
         } catch (_: Exception) {
         } finally {
@@ -113,24 +134,28 @@ class AutoVolumeManager(private val context: Context) {
         return if (rms > 0) 20 * log10(rms) else 0.0
     }
 
-    private fun adjustVolumeForDecibels(db: Double) {
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+    private fun adjustRelativeVolume(currentDb: Double) {
+        if (userBaseVolumeStep < 0) return
 
-        val minVol = (maxVolume * 0.20).toInt().coerceAtLeast(1)
-        val modVol = (maxVolume * 0.27).toInt().coerceAtLeast(1)
-        val maxVol = (maxVolume * 0.50).toInt()
+        val maxSystemSteps = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
 
-        val targetVolumeLevel = when {
-            db < 52 -> minVol   // Quiet -> 20%
-            db < 66 -> modVol   // Moderate noise -> 27%
-            else    -> maxVol   // Loud noise -> 50%
-        }.coerceIn(minVol, maxVol)
+        // Estimated output sound level of the headphones in dB based on base volume
+        val estimatedMusicDb = 40.0 + ((userBaseVolumeStep.toDouble() / maxSystemSteps) * 35.0)
 
-        if (abs(targetVolumeLevel - currentVolume) >= 1) {
+        // Extra noise level above the music playback
+        val excessNoiseDb = (currentDb - estimatedMusicDb).coerceAtLeast(0.0)
+
+        // Convert excess dB into proportional step boost (+1 step roughly per 4 dB excess)
+        val stepBoost = (excessNoiseDb / 4.0).roundToInt().coerceAtMost((maxSystemSteps * 0.20).roundToInt())
+
+        val targetStep = (userBaseVolumeStep + stepBoost).coerceIn(1, maxSystemSteps)
+
+        if (targetStep != currentVol) {
+            lastAppliedVolumeStep = targetStep
             audioManager.setStreamVolume(
                 AudioManager.STREAM_MUSIC,
-                targetVolumeLevel,
+                targetStep,
                 0
             )
         }
