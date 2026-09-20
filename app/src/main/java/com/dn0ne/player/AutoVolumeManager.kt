@@ -8,6 +8,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.PowerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,7 +21,10 @@ import kotlin.math.sqrt
 
 class AutoVolumeManager(private val context: Context) {
 
-    private val audioManager = context.getSystemService(Context.CAMERA_SERVICE.let { AudioManager.ACTION_AUDIO_BECOMING_NOISY; Context.AUDIO_SERVICE }) as AudioManager
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    private var wakeLock: PowerManager.WakeLock? = null
+
     private var recordingJob: Job? = null
     private var isRunning = false
 
@@ -56,6 +60,7 @@ class AutoVolumeManager(private val context: Context) {
         prefs.registerOnSharedPreferenceChangeListener(preferenceListener)
     }
 
+    @SuppressLint("WakelockTimeout")
     fun start() {
         if (isRunning) return
         if (!AutoVolumePreferences.isEnabled(context)) return
@@ -65,6 +70,17 @@ class AutoVolumeManager(private val context: Context) {
         userBaseVolumeStep = currentVol
         lastAppliedVolumeStep = currentVol
         pendingTargetStep = currentVol
+
+        // Acquire a partial wake lock so the CPU keeps processing mic input while locked
+        if (wakeLock == null) {
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "Panchajanya:AutoVolumeWakeLock"
+            ).apply {
+                setReferenceCounted(false)
+            }
+        }
+        wakeLock?.acquire()
 
         isRunning = true
         recordingJob = CoroutineScope(Dispatchers.IO).launch {
@@ -79,6 +95,12 @@ class AutoVolumeManager(private val context: Context) {
         userBaseVolumeStep = -1
         lastAppliedVolumeStep = -1
         pendingTargetStep = -1
+
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+        } catch (_: Exception) {}
     }
 
     @SuppressLint("MissingPermission")
@@ -118,7 +140,6 @@ class AutoVolumeManager(private val context: Context) {
                 if (readCount > 0) {
                     val instantDb = calculateDecibels(buffer, readCount)
                     
-                    // 70% history / 30% instant to filter out micro-transients (breaths/wind)
                     smoothedDb = (smoothedDb * 0.70) + (instantDb * 0.30)
                     processVolumeWithDelay(smoothedDb)
                 }
@@ -132,6 +153,11 @@ class AutoVolumeManager(private val context: Context) {
                 audioRecord?.release()
             } catch (_: Exception) {}
             isRunning = false
+            try {
+                if (wakeLock?.isHeld == true) {
+                    wakeLock?.release()
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -150,28 +176,22 @@ class AutoVolumeManager(private val context: Context) {
         val maxSystemSteps = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
 
-        // Estimated output level baseline of the music
         val baselineAcousticDb = 38.0 + ((userBaseVolumeStep.toDouble() / maxSystemSteps) * 32.0)
 
-        // 5.0 dB deadzone: ignores minor wind, air puffs, and gentle background rustling
         val noiseDeadzoneDb = 5.0
         val rawExcess = currentDb - baselineAcousticDb
         val excessNoiseDb = if (rawExcess > noiseDeadzoneDb) rawExcess - noiseDeadzoneDb else 0.0
 
-        // Less twitchy scaling: +1 volume step per 3.0 dB of sustained ambient noise
         val stepBoost = (excessNoiseDb / 3.0).roundToInt()
         val calculatedTargetStep = (userBaseVolumeStep + stepBoost).coerceIn(userBaseVolumeStep, maxSystemSteps)
 
         val currentTime = System.currentTimeMillis()
 
-        // Debounce / Delay logic
         if (calculatedTargetStep != currentVol) {
             if (calculatedTargetStep != pendingTargetStep) {
-                // Noise level changed to a new target; start timer
                 pendingTargetStep = calculatedTargetStep
                 pendingStepStartTime = currentTime
             } else if (currentTime - pendingStepStartTime >= reactionDelayMs) {
-                // Sound persisted past the delay threshold; apply the update
                 lastAppliedVolumeStep = calculatedTargetStep
                 audioManager.setStreamVolume(
                     AudioManager.STREAM_MUSIC,
@@ -180,7 +200,6 @@ class AutoVolumeManager(private val context: Context) {
                 )
             }
         } else {
-            // Already at target level; clear pending state
             pendingTargetStep = currentVol
         }
     }
