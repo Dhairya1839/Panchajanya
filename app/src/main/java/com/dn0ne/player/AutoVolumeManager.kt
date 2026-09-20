@@ -20,7 +20,7 @@ import kotlin.math.sqrt
 
 class AutoVolumeManager(private val context: Context) {
 
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val audioManager = context.getSystemService(Context.CAMERA_SERVICE.let { AudioManager.ACTION_AUDIO_BECOMING_NOISY; Context.AUDIO_SERVICE }) as AudioManager
     private var recordingJob: Job? = null
     private var isRunning = false
 
@@ -37,6 +37,11 @@ class AutoVolumeManager(private val context: Context) {
 
     // Smoothed ambient noise tracker
     private var smoothedDb = 45.0
+
+    // Debounce / Reaction Delay variables
+    private var pendingTargetStep = -1
+    private var pendingStepStartTime = 0L
+    private val reactionDelayMs = 600L // Noise must persist for 600ms before changing volume
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "auto_volume_enabled") {
@@ -59,6 +64,7 @@ class AutoVolumeManager(private val context: Context) {
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         userBaseVolumeStep = currentVol
         lastAppliedVolumeStep = currentVol
+        pendingTargetStep = currentVol
 
         isRunning = true
         recordingJob = CoroutineScope(Dispatchers.IO).launch {
@@ -72,6 +78,7 @@ class AutoVolumeManager(private val context: Context) {
         recordingJob = null
         userBaseVolumeStep = -1
         lastAppliedVolumeStep = -1
+        pendingTargetStep = -1
     }
 
     @SuppressLint("MissingPermission")
@@ -99,24 +106,24 @@ class AutoVolumeManager(private val context: Context) {
                     break
                 }
 
-                // Detect manual user button presses (volume rocker)
+                // Detect manual user adjustments (physical volume keys)
                 val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                 if (currentVol != lastAppliedVolumeStep) {
                     userBaseVolumeStep = currentVol
                     lastAppliedVolumeStep = currentVol
+                    pendingTargetStep = currentVol
                 }
 
                 val readCount = audioRecord.read(buffer, 0, buffer.size)
                 if (readCount > 0) {
                     val instantDb = calculateDecibels(buffer, readCount)
                     
-                    // 50/50 mix for rapid, spontaneous reaction to surrounding sound
-                    smoothedDb = (smoothedDb * 0.50) + (instantDb * 0.50)
-                    adjustRelativeVolume(smoothedDb)
+                    // 70% history / 30% instant to filter out micro-transients (breaths/wind)
+                    smoothedDb = (smoothedDb * 0.70) + (instantDb * 0.30)
+                    processVolumeWithDelay(smoothedDb)
                 }
 
-                // Rapid 180ms polling loop
-                delay(180)
+                delay(200)
             }
         } catch (_: Exception) {
         } finally {
@@ -137,32 +144,44 @@ class AutoVolumeManager(private val context: Context) {
         return if (rms > 0) 20 * log10(rms) else 0.0
     }
 
-    private fun adjustRelativeVolume(currentDb: Double) {
+    private fun processVolumeWithDelay(currentDb: Double) {
         if (userBaseVolumeStep < 0) return
 
         val maxSystemSteps = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
 
         // Estimated output level baseline of the music
-        val baselineAcousticDb = 35.0 + ((userBaseVolumeStep.toDouble() / maxSystemSteps) * 30.0)
+        val baselineAcousticDb = 38.0 + ((userBaseVolumeStep.toDouble() / maxSystemSteps) * 32.0)
 
-        // Measure how much ambient sound exceeds your music baseline
-        val excessNoiseDb = (currentDb - baselineAcousticDb).coerceAtLeast(0.0)
+        // 5.0 dB deadzone: ignores minor wind, air puffs, and gentle background rustling
+        val noiseDeadzoneDb = 5.0
+        val rawExcess = currentDb - baselineAcousticDb
+        val excessNoiseDb = if (rawExcess > noiseDeadzoneDb) rawExcess - noiseDeadzoneDb else 0.0
 
-        // Aggressive boost to overpower outside noise:
-        // Adds +1 system volume step for roughly every 1.5 dB of extra sound.
-        // No percentage cap applied; can dynamically scale up to maximum hardware limit.
-        val stepBoost = (excessNoiseDb / 1.5).roundToInt()
+        // Less twitchy scaling: +1 volume step per 3.0 dB of sustained ambient noise
+        val stepBoost = (excessNoiseDb / 3.0).roundToInt()
+        val calculatedTargetStep = (userBaseVolumeStep + stepBoost).coerceIn(userBaseVolumeStep, maxSystemSteps)
 
-        val targetStep = (userBaseVolumeStep + stepBoost).coerceIn(userBaseVolumeStep, maxSystemSteps)
+        val currentTime = System.currentTimeMillis()
 
-        if (targetStep != currentVol) {
-            lastAppliedVolumeStep = targetStep
-            audioManager.setStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                targetStep,
-                0 // Silent adjustment without triggering system popups
-            )
+        // Debounce / Delay logic
+        if (calculatedTargetStep != currentVol) {
+            if (calculatedTargetStep != pendingTargetStep) {
+                // Noise level changed to a new target; start timer
+                pendingTargetStep = calculatedTargetStep
+                pendingStepStartTime = currentTime
+            } else if (currentTime - pendingStepStartTime >= reactionDelayMs) {
+                // Sound persisted past the delay threshold; apply the update
+                lastAppliedVolumeStep = calculatedTargetStep
+                audioManager.setStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    calculatedTargetStep,
+                    0
+                )
+            }
+        } else {
+            // Already at target level; clear pending state
+            pendingTargetStep = currentVol
         }
     }
 
