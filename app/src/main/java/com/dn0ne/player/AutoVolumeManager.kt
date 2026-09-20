@@ -109,11 +109,14 @@ class AutoVolumeManager(private val context: Context) {
                 val readCount = audioRecord.read(buffer, 0, buffer.size)
                 if (readCount > 0) {
                     val instantDb = calculateDecibels(buffer, readCount)
-                    smoothedDb = (smoothedDb * 0.70) + (instantDb * 0.30)
+                    
+                    // 50/50 mix for rapid, spontaneous reaction to surrounding sound
+                    smoothedDb = (smoothedDb * 0.50) + (instantDb * 0.50)
                     adjustRelativeVolume(smoothedDb)
                 }
 
-                delay(400)
+                // Rapid 180ms polling loop
+                delay(180)
             }
         } catch (_: Exception) {
         } finally {
@@ -135,33 +138,33 @@ class AutoVolumeManager(private val context: Context) {
     }
 
     private fun adjustRelativeVolume(currentDb: Double) {
-    if (userBaseVolumeStep < 0) return
+        if (userBaseVolumeStep < 0) return
 
-    val maxSystemSteps = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-    val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val maxSystemSteps = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
 
-    // Output level baseline
-    val estimatedMusicDb = 38.0 + ((userBaseVolumeStep.toDouble() / maxSystemSteps) * 32.0)
+        // Estimated output level baseline of the music
+        val baselineAcousticDb = 35.0 + ((userBaseVolumeStep.toDouble() / maxSystemSteps) * 30.0)
 
-    val excessNoiseDb = (currentDb - estimatedMusicDb).coerceAtLeast(0.0)
+        // Measure how much ambient sound exceeds your music baseline
+        val excessNoiseDb = (currentDb - baselineAcousticDb).coerceAtLeast(0.0)
 
-    // More aggressive scaling: +1 step per ~2.2 dB of background noise
-    // Max boost allowed: up to 35% of the total system volume range
-    val maxAllowedBoostSteps = (maxSystemSteps * 0.35).roundToInt().coerceAtLeast(3)
-    val stepBoost = (excessNoiseDb / 2.2).roundToInt().coerceAtMost(maxAllowedBoostSteps)
+        // Aggressive boost to overpower outside noise:
+        // Adds +1 system volume step for roughly every 1.5 dB of extra sound.
+        // No percentage cap applied; can dynamically scale up to maximum hardware limit.
+        val stepBoost = (excessNoiseDb / 1.5).roundToInt()
 
-    val targetStep = (userBaseVolumeStep + stepBoost).coerceIn(1, maxSystemSteps)
+        val targetStep = (userBaseVolumeStep + stepBoost).coerceIn(userBaseVolumeStep, maxSystemSteps)
 
-    if (targetStep != currentVol) {
-        lastAppliedVolumeStep = targetStep
-        audioManager.setStreamVolume(
-            AudioManager.STREAM_MUSIC,
-            targetStep,
-            0
-        )
+        if (targetStep != currentVol) {
+            lastAppliedVolumeStep = targetStep
+            audioManager.setStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                targetStep,
+                0 // Silent adjustment without triggering system popups
+            )
+        }
     }
-}
-
 
     fun isBluetoothOutputConnected(): Boolean {
         val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
