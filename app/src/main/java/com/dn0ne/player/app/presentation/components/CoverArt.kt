@@ -30,20 +30,15 @@ import kotlinx.coroutines.withContext
 @Composable
 fun CoverArt(
     uri: Uri,
-    filePath: String? = null,
     onCoverArtLoaded: (ImageBitmap?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var bitmap by remember(uri, filePath) { mutableStateOf<Bitmap?>(null) }
-    var isLoading by remember(uri, filePath) { mutableStateOf(true) }
+    var bitmap by remember(uri) { mutableStateOf<Bitmap?>(null) }
 
-    LaunchedEffect(uri, filePath) {
-        isLoading = true
-        val loaded = ArtworkLoader.loadArtwork(context, uri, filePath)
+    LaunchedEffect(uri) {
+        val loaded = ArtworkLoader.loadArtwork(context, uri, null)
         bitmap = loaded
-        isLoading = false
-
         withContext(Dispatchers.Main) {
             onCoverArtLoaded(loaded?.asImageBitmap())
         }
