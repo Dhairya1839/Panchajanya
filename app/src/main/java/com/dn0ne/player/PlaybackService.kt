@@ -396,8 +396,28 @@ object SleepTimer {
     private val _isRunning = MutableStateFlow(false)
     val isRunning = _isRunning.asStateFlow()
 
+    fun addOnFinishCallback(callback: () -> Unit) {
+        finishCallbacks.add(callback)
+    }
+
     fun start() {
         stop()
         timer = object : CountDownTimer(_minutesLeft.value.toLong() * 60000L, 60000L) {
             override fun onTick(millisUntilFinished: Long) {
-                _minutesLeft.update { millisUntilFinished.toInt() / 60000
+                _minutesLeft.update { (millisUntilFinished / 60000L).toInt() }
+            }
+
+            override fun onFinish() {
+                _isRunning.update { false }
+                finishCallbacks.fastForEach { it() }
+            }
+        }.start()
+        _isRunning.update { true }
+    }
+
+    fun stop() {
+        timer?.cancel()
+        timer = null
+        _isRunning.update { false }
+    }
+}
