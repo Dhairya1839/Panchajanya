@@ -1,6 +1,7 @@
 package com.dn0ne.player.app.presentation.components.settings
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.FilterCenterFocus
 import androidx.compose.material.icons.rounded.FlashlightOn
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -73,6 +75,14 @@ fun PlaybackSettings(
 
     var currentTorchMode by remember {
         mutableStateOf(TorchSyncPreferences.getMode(context))
+    }
+
+    // Spatial Audio preferences
+    val spatialPrefs = remember {
+        context.getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+    }
+    var isSpatialAudioEnabled by remember {
+        mutableStateOf(spatialPrefs.getBoolean("is_spatial_enabled", false))
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -208,6 +218,19 @@ fun PlaybackSettings(
                     .fillMaxWidth()
             )
         }
+
+        // Spatial 3D Audio Toggle
+        SettingSwitch(
+            title = "Spatial 3D Audio",
+            supportingText = "Simulates a wider binaural 3D soundstage for connected headphones and earbuds",
+            icon = Icons.Rounded.GraphicEq,
+            isChecked = isSpatialAudioEnabled,
+            onCheckedChange = { targetState ->
+                isSpatialAudioEnabled = targetState
+                spatialPrefs.edit().putBoolean("is_spatial_enabled", targetState).apply()
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         SettingSwitch(
             title = "Adaptive volume",
