@@ -64,8 +64,10 @@ fun TrackListItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
+            // Pass both uri and filePath so moved/unindexed tracks can load artwork directly
             CoverArt(
                 uri = track.coverArtUri,
+                filePath = try { track.path } catch (_: Exception) { track.uri.path },
                 modifier = Modifier
                     .size(60.dp)
                     .clip(ShapeDefaults.Small)
