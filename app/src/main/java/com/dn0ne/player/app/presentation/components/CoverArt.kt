@@ -28,8 +28,8 @@ import com.dn0ne.player.ArtworkLoader
 fun CoverArt(
     uri: Uri,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit = {},
-    onCoverArtLoaded: (Bitmap?) -> Unit = {}
+    onCoverArtLoaded: (Bitmap?) -> Unit = {},
+    content: @Composable () -> Unit = {}
 ) {
     val context = LocalContext.current
     var bitmap by remember(uri) { mutableStateOf<Bitmap?>(null) }
