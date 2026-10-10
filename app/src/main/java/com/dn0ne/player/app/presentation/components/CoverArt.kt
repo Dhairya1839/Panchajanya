@@ -27,17 +27,20 @@ import com.dn0ne.player.ArtworkLoader
 @Composable
 fun CoverArt(
     uri: Uri?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onCoverArtLoaded: ((Bitmap?) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var bitmap by remember(uri) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(uri) {
-        bitmap = if (uri != null) {
+        val loadedBitmap = if (uri != null) {
             ArtworkLoader.loadArtwork(context, uri)
         } else {
             null
         }
+        bitmap = loadedBitmap
+        onCoverArtLoaded?.invoke(loadedBitmap)
     }
 
     Box(
