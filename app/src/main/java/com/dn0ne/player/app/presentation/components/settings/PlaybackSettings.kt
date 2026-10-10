@@ -211,7 +211,7 @@ fun PlaybackSettings(
 
         SettingSwitch(
             title = "Adaptive volume",
-            supportingText = "Automatically adjusts volume to surrounding noise when Bluetooth is connected (20% - 50%)",
+            supportingText = "Dynamically boosts volume to overcome ambient background noise when Bluetooth is connected",
             icon = Icons.AutoMirrored.Rounded.VolumeUp,
             isChecked = isAutoVolumeEnabled,
             onCheckedChange = { targetState ->
@@ -219,6 +219,9 @@ fun PlaybackSettings(
                     val permissionsNeeded = mutableListOf(Manifest.permission.RECORD_AUDIO)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         permissionsNeeded.add(Manifest.permission.BLUETOOTH_CONNECT)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        permissionsNeeded.add(Manifest.permission.POST_NOTIFICATIONS)
                     }
 
                     val allGranted = permissionsNeeded.all {
