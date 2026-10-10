@@ -95,12 +95,13 @@ fun LazyColumnWithCollapsibleTopBar(
     topBarContent: @Composable BoxScope.() -> Unit,
     collapseFraction: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    lazyListState: LazyListState = rememberLazyListState(),
+    listState: LazyListState = rememberLazyListState(),
+    enableScrollbar: Boolean = true,
     minTopBarHeight: Dp = 64.dp,
     maxTopBarHeight: Dp = 160.dp,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    contentHorizontalAlignment: Alignment.Horizontal = Alignment.Start,
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
-    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     content: LazyListScope.() -> Unit
 ) {
     val density = LocalDensity.current
@@ -110,10 +111,10 @@ fun LazyColumnWithCollapsibleTopBar(
 
     val fraction by remember {
         derivedStateOf {
-            if (lazyListState.firstVisibleItemIndex > 0) {
+            if (listState.firstVisibleItemIndex > 0) {
                 0f
             } else {
-                (1f - (lazyListState.firstVisibleItemScrollOffset / scrollRange)).coerceIn(0f, 1f)
+                (1f - (listState.firstVisibleItemScrollOffset / scrollRange)).coerceIn(0f, 1f)
             }
         }
     }
@@ -136,7 +137,7 @@ fun LazyColumnWithCollapsibleTopBar(
         }
 
         LazyColumn(
-            state = lazyListState,
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -147,7 +148,7 @@ fun LazyColumnWithCollapsibleTopBar(
                 bottom = contentPadding.calculateBottomPadding()
             ),
             verticalArrangement = verticalArrangement,
-            horizontalAlignment = horizontalAlignment,
+            horizontalAlignment = contentHorizontalAlignment,
             content = content
         )
     }
