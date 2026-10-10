@@ -265,6 +265,14 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    private val spatialPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "is_spatial_enabled") {
+            val enabled = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+                .getBoolean("is_spatial_enabled", false)
+            spatialAudioController.updateSpatialEnabled(enabled)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -276,6 +284,9 @@ class PlaybackService : MediaSessionService() {
 
         val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
         torchPrefs.registerOnSharedPreferenceChangeListener(torchPrefsListener)
+
+        val spatialPrefs = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+        spatialPrefs.registerOnSharedPreferenceChangeListener(spatialPrefsListener)
 
         val shouldHandleAudioFocus = get<Settings>().handleAudioFocus
         val audioAttributes = AudioAttributes.Builder()
@@ -351,6 +362,10 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
         torchPrefs.unregisterOnSharedPreferenceChangeListener(torchPrefsListener)
+
+        val spatialPrefs = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+        spatialPrefs.unregisterOnSharedPreferenceChangeListener(spatialPrefsListener)
+
         torchSyncManager.release()
         spatialAudioController.release()
         autoVolumeManager.stop()
@@ -385,26 +400,4 @@ object SleepTimer {
         stop()
         timer = object : CountDownTimer(_minutesLeft.value.toLong() * 60000L, 60000L) {
             override fun onTick(millisUntilFinished: Long) {
-                _minutesLeft.update { millisUntilFinished.toInt() / 60000 + 1 }
-            }
-
-            override fun onFinish() {
-                finishCallbacks.fastForEach { it.invoke() }
-                _isRunning.update { false }
-            }
-
-        }.start()
-
-        _isRunning.update { true }
-    }
-
-    fun stop() {
-        timer?.cancel()
-
-        _isRunning.update { false }
-    }
-
-    fun addOnFinishCallback(callback: () -> Unit) {
-        finishCallbacks += callback
-    }
-}
+                _minutesLeft.update { millisUntilFinished.toInt() / 60000
