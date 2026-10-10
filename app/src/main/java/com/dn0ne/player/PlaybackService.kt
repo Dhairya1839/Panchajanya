@@ -198,3 +198,246 @@ class EqualizerController(context: Context) {
                     val upperLevelLimit = bandLevelRange[1]
                     _settings.upperLevelLimit = upperLevelLimit.toInt()
 
+                    release()
+                }
+
+                audioTrack.release()
+            } catch (e: Exception) {
+                Log.e("FIRST LAUNCH EQUALIZER INITIALIZATION", e.message, e)
+            }
+        }
+    }
+}
+
+class SpatialAudioController(private val context: Context) {
+    private val prefs = context.getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+    private var virtualizer: Virtualizer? = null
+    private var _audioSessionId: Int? = null
+
+    private val _isSpatialEnabled = MutableStateFlow(prefs.getBoolean("is_spatial_enabled", false))
+    val isSpatialEnabled = _isSpatialEnabled.asStateFlow()
+
+    fun updateSpatialEnabled(enabled: Boolean) {
+        _isSpatialEnabled.update { enabled }
+        prefs.edit().putBoolean("is_spatial_enabled", enabled).apply()
+        _audioSessionId?.let { updateVirtualizer(it) }
+    }
+
+    fun updateVirtualizer(audioSessionId: Int) {
+        if (audioSessionId == 0 || audioSessionId == C.AUDIO_SESSION_ID_UNSET) return
+        _audioSessionId = audioSessionId
+
+        try {
+            virtualizer?.release()
+            virtualizer = null
+
+            if (!_isSpatialEnabled.value) return
+
+            // Priority must be 0 for standard app effects
+            virtualizer = Virtualizer(0, audioSessionId).apply {
+                // Try binaural mode safely without crashing if device unsupported
+                try {
+                    forceVirtualizationMode(Virtualizer.VIRTUALIZATION_MODE_BINAURAL)
+                } catch (_: Exception) {}
+
+                // Enable the effect first
+                enabled = true
+
+                // Apply maximum spatial expansion if supported
+                if (strengthSupported) {
+                    setStrength(1000.toShort())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("SpatialAudioController", "Failed to attach Virtualizer", e)
+        }
+    }
+
+    fun release() {
+        try {
+            virtualizer?.release()
+            virtualizer = null
+            _audioSessionId = null
+        } catch (_: Exception) {}
+    }
+}
+
+class PlaybackService : MediaSessionService() {
+    private var mediaSession: MediaSession? = null
+    private lateinit var autoVolumeManager: AutoVolumeManager
+    private lateinit var torchSyncManager: TorchSyncManager
+    private lateinit var spatialAudioController: SpatialAudioController
+    private val equalizerController = get<EqualizerController>()
+
+    private val torchPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "torch_sync_mode") {
+            val newMode = TorchSyncPreferences.getMode(this)
+            torchSyncManager.setMode(newMode)
+        }
+    }
+
+    private val spatialPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "is_spatial_enabled") {
+            val enabled = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+                .getBoolean("is_spatial_enabled", false)
+            spatialAudioController.updateSpatialEnabled(enabled)
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+
+        autoVolumeManager = AutoVolumeManager(this)
+        torchSyncManager = TorchSyncManager(this)
+        spatialAudioController = SpatialAudioController(this)
+
+        torchSyncManager.setMode(TorchSyncPreferences.getMode(this))
+
+        val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
+        torchPrefs.registerOnSharedPreferenceChangeListener(torchPrefsListener)
+
+        val spatialPrefs = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+        spatialPrefs.registerOnSharedPreferenceChangeListener(spatialPrefsListener)
+
+        val shouldHandleAudioFocus = get<Settings>().handleAudioFocus
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        val player = ExoPlayer.Builder(this)
+            .setAudioAttributes(audioAttributes, shouldHandleAudioFocus)
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
+
+        player.addListener(object : Player.Listener {
+            @OptIn(UnstableApi::class)
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId != 0) {
+                    equalizerController.updateEqualizer(audioSessionId)
+                    spatialAudioController.updateVirtualizer(audioSessionId)
+                    torchSyncManager.attachAudioSession(audioSessionId)
+                }
+            }
+
+            @OptIn(UnstableApi::class)
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING) {
+                    val audioSessionId = player.audioSessionId
+                    if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId != 0) {
+                        equalizerController.updateEqualizer(audioSessionId)
+                        spatialAudioController.updateVirtualizer(audioSessionId)
+                        torchSyncManager.attachAudioSession(audioSessionId)
+                    }
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying && AutoVolumePreferences.isEnabled(this@PlaybackService)) {
+                    autoVolumeManager.start()
+                } else {
+                    autoVolumeManager.stop()
+                }
+
+                if (!isPlaying) {
+                    torchSyncManager.stop()
+                } else {
+                    torchSyncManager.setMode(TorchSyncPreferences.getMode(this@PlaybackService))
+                }
+            }
+        })
+
+        SleepTimer.addOnFinishCallback {
+            player.stop()
+        }
+
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(pendingIntent)
+            .build()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val player = mediaSession?.player!!
+
+        if (!player.playWhenReady
+            || player.mediaItemCount == 0
+            || player.playbackState == Player.STATE_ENDED
+        ) {
+            stopSelf()
+        }
+    }
+
+    override fun onDestroy() {
+        val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
+        torchPrefs.unregisterOnSharedPreferenceChangeListener(torchPrefsListener)
+
+        val spatialPrefs = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
+        spatialPrefs.unregisterOnSharedPreferenceChangeListener(spatialPrefsListener)
+
+        torchSyncManager.release()
+        spatialAudioController.release()
+        autoVolumeManager.stop()
+        equalizerController.releaseEqualizer()
+        SleepTimer.stop()
+        mediaSession?.run {
+            player.release()
+            release()
+            mediaSession = null
+        }
+        super.onDestroy()
+    }
+
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
+        mediaSession
+}
+
+object SleepTimer {
+    var timer: CountDownTimer? = null
+    private val finishCallbacks = mutableListOf<() -> Unit>()
+
+    private val _minutesLeft = MutableStateFlow(1)
+    val minutesLeft = _minutesLeft.asStateFlow()
+    fun updateMinutesLeft(value: Int) {
+        _minutesLeft.update { value }
+    }
+
+    private val _isRunning = MutableStateFlow(false)
+    val isRunning = _isRunning.asStateFlow()
+
+    fun addOnFinishCallback(callback: () -> Unit) {
+        finishCallbacks.add(callback)
+    }
+
+    fun start() {
+        stop()
+        timer = object : CountDownTimer(_minutesLeft.value.toLong() * 60000L, 60000L) {
+            override fun onTick(millisUntilFinished: Long) {
+                _minutesLeft.update { (millisUntilFinished / 60000L).toInt() }
+            }
+
+            override fun onFinish() {
+                _isRunning.update { false }
+                finishCallbacks.fastForEach { it() }
+            }
+        }.start()
+        _isRunning.update { true }
+    }
+
+    fun stop() {
+        timer?.cancel()
+        timer = null
+        _isRunning.update { false }
+    }
+}
