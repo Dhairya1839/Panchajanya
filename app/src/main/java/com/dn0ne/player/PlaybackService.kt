@@ -7,7 +7,6 @@ import android.content.SharedPreferences
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.audiofx.Equalizer
-import android.media.audiofx.Virtualizer
 import android.os.CountDownTimer
 import android.util.Log
 import androidx.annotation.OptIn
@@ -209,53 +208,10 @@ class EqualizerController(context: Context) {
     }
 }
 
-class SpatialAudioController(private val context: Context) {
-    private val prefs = context.getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
-    private var virtualizer: Virtualizer? = null
-    private var _audioSessionId: Int? = null
-
-    private val _isSpatialEnabled = MutableStateFlow(prefs.getBoolean("is_spatial_enabled", false))
-    val isSpatialEnabled = _isSpatialEnabled.asStateFlow()
-
-    fun updateSpatialEnabled(enabled: Boolean) {
-        _isSpatialEnabled.update { enabled }
-        prefs.edit().putBoolean("is_spatial_enabled", enabled).apply()
-        _audioSessionId?.let { updateVirtualizer(it) }
-    }
-
-    fun updateVirtualizer(audioSessionId: Int) {
-        _audioSessionId = audioSessionId
-
-        try {
-            virtualizer?.release()
-            virtualizer = null
-
-            if (!_isSpatialEnabled.value) return
-
-            virtualizer = Virtualizer(Int.MAX_VALUE, audioSessionId).apply {
-                forceVirtualizationMode(Virtualizer.VIRTUALIZATION_MODE_BINAURAL)
-                setStrength(1000.toShort()) // Maximum 3D binaural effect width
-                enabled = true
-            }
-        } catch (e: Exception) {
-            Log.e("SpatialAudioController", "Failed to attach Virtualizer", e)
-        }
-    }
-
-    fun release() {
-        try {
-            virtualizer?.release()
-            virtualizer = null
-            _audioSessionId = null
-        } catch (_: Exception) {}
-    }
-}
-
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private lateinit var autoVolumeManager: AutoVolumeManager
     private lateinit var torchSyncManager: TorchSyncManager
-    private lateinit var spatialAudioController: SpatialAudioController
     private val equalizerController = get<EqualizerController>()
 
     private val torchPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -265,28 +221,16 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    private val spatialPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "is_spatial_enabled") {
-            val enabled = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
-                .getBoolean("is_spatial_enabled", false)
-            spatialAudioController.updateSpatialEnabled(enabled)
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
 
         autoVolumeManager = AutoVolumeManager(this)
         torchSyncManager = TorchSyncManager(this)
-        spatialAudioController = SpatialAudioController(this)
 
         torchSyncManager.setMode(TorchSyncPreferences.getMode(this))
 
         val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
         torchPrefs.registerOnSharedPreferenceChangeListener(torchPrefsListener)
-
-        val spatialPrefs = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
-        spatialPrefs.registerOnSharedPreferenceChangeListener(spatialPrefsListener)
 
         val shouldHandleAudioFocus = get<Settings>().handleAudioFocus
         val audioAttributes = AudioAttributes.Builder()
@@ -307,7 +251,6 @@ class PlaybackService : MediaSessionService() {
                     val audioSessionId = player.audioSessionId
                     if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
                         equalizerController.updateEqualizer(audioSessionId)
-                        spatialAudioController.updateVirtualizer(audioSessionId)
                         torchSyncManager.attachAudioSession(audioSessionId)
                     }
                 }
@@ -363,11 +306,7 @@ class PlaybackService : MediaSessionService() {
         val torchPrefs = getSharedPreferences("panchajanya_torch_settings", Context.MODE_PRIVATE)
         torchPrefs.unregisterOnSharedPreferenceChangeListener(torchPrefsListener)
 
-        val spatialPrefs = getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
-        spatialPrefs.unregisterOnSharedPreferenceChangeListener(spatialPrefsListener)
-
         torchSyncManager.release()
-        spatialAudioController.release()
         autoVolumeManager.stop()
         equalizerController.releaseEqualizer()
         SleepTimer.stop()
