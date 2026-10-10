@@ -1,7 +1,6 @@
 package com.dn0ne.player.app.presentation.components.settings
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
@@ -17,11 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.FilterCenterFocus
 import androidx.compose.material.icons.rounded.FlashlightOn
-import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -74,14 +73,6 @@ fun PlaybackSettings(
 
     var currentTorchMode by remember {
         mutableStateOf(TorchSyncPreferences.getMode(context))
-    }
-
-    // Spatial Audio preferences
-    val spatialPrefs = remember {
-        context.getSharedPreferences("spatial_audio_settings", Context.MODE_PRIVATE)
-    }
-    var isSpatialAudioEnabled by remember {
-        mutableStateOf(spatialPrefs.getBoolean("is_spatial_enabled", false))
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -218,23 +209,10 @@ fun PlaybackSettings(
             )
         }
 
-        // Spatial 3D Audio Toggle (using valid core icon)
-        SettingSwitch(
-            title = "Spatial 3D Audio",
-            supportingText = "Simulates a wider binaural 3D soundstage for connected headphones and earbuds",
-            icon = Icons.Rounded.Headphones,
-            isChecked = isSpatialAudioEnabled,
-            onCheckedChange = { targetState ->
-                isSpatialAudioEnabled = targetState
-                spatialPrefs.edit().putBoolean("is_spatial_enabled", targetState).apply()
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-
         SettingSwitch(
             title = "Adaptive volume",
             supportingText = "Dynamically boosts volume to overcome ambient background noise when Bluetooth is connected",
-            icon = Icons.Rounded.Equalizer,
+            icon = Icons.AutoMirrored.Rounded.VolumeUp,
             isChecked = isAutoVolumeEnabled,
             onCheckedChange = { targetState ->
                 if (targetState) {
@@ -257,4 +235,108 @@ fun PlaybackSettings(
                         permissionLauncher.launch(permissionsNeeded.toTypedArray())
                     }
                 } else {
-                    isAuto
+                    isAutoVolumeEnabled = false
+                    AutoVolumePreferences.setEnabled(context, false)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        SettingSwitch(
+            title = "Torch Music Sync",
+            supportingText = "Synchronizes the camera flashlight with the beat of the music",
+            icon = Icons.Rounded.FlashlightOn,
+            isChecked = currentTorchMode != TorchSyncMode.OFF,
+            onCheckedChange = { isChecked ->
+                if (isChecked) {
+                    val hasCameraPermission = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (hasCameraPermission) {
+                        currentTorchMode = TorchSyncMode.DISCO
+                        TorchSyncPreferences.setMode(context, TorchSyncMode.DISCO)
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                } else {
+                    currentTorchMode = TorchSyncMode.OFF
+                    TorchSyncPreferences.setMode(context, TorchSyncMode.OFF)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        AnimatedVisibility(
+            visible = currentTorchMode != TorchSyncMode.OFF
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FilterChip(
+                    selected = currentTorchMode == TorchSyncMode.DISCO,
+                    onClick = {
+                        currentTorchMode = TorchSyncMode.DISCO
+                        TorchSyncPreferences.setMode(context, TorchSyncMode.DISCO)
+                    },
+                    label = { Text("Disco (Strobe)") }
+                )
+
+                FilterChip(
+                    selected = currentTorchMode == TorchSyncMode.FADE,
+                    onClick = {
+                        currentTorchMode = TorchSyncMode.FADE
+                        TorchSyncPreferences.setMode(context, TorchSyncMode.FADE)
+                    },
+                    label = { Text("Fade (Glow)") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EqualizerSettings(
+    equalizerController: EqualizerController,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        val lowerLevelLimit by equalizerController.lowerLevelLimit.collectAsState()
+        val upperLevelLimit by equalizerController.upperLevelLimit.collectAsState()
+        val bandFrequencies by equalizerController.bandFrequencies.collectAsState()
+        val bandLevels by equalizerController.bandLevels.collectAsState()
+        bandLevels?.fastForEachIndexed { index, level ->
+            SettingSlider(
+                title = bandFrequencies?.get(index) ?: "",
+                value = level.toFloat(),
+                valueToShow = "${level / 100f}dB",
+                onValueChange = {
+                    bandLevels?.let { bandLevels ->
+                        equalizerController.updateBandLevels(
+                            bandLevels.toMutableList().apply {
+                                set(index, it.toInt().toShort())
+                            }
+                        )
+                    }
+                },
+                onValueChangeFinished = {},
+                valueRange = lowerLevelLimit.toFloat()..upperLevelLimit.toFloat(),
+            )
+        }
+
+        val context = LocalContext.current
+        FilledTonalButton(
+            onClick = equalizerController::resetBandLevels
+        ) {
+            Text(text = context.resources.getString(R.string.reset))
+        }
+    }
+}
