@@ -218,10 +218,9 @@ fun TrackInfoSheet(
                             )
                         }
 
-                        val track = state.track
-                        if (track != null) {
+                        state.track?.run {
                             CoverArt(
-                                uri = track.coverArtUri,
+                                uri = coverArtUri,
                                 modifier = Modifier
                                     .requiredWidthIn(max = 400.dp)
                                     .fillMaxWidth()
@@ -233,39 +232,39 @@ fun TrackInfoSheet(
 
                             TagRow(
                                 tag = context.resources.getString(R.string.title),
-                                value = track.title ?: context.resources.getString(R.string.unknown_title)
+                                value = title ?: context.resources.getString(R.string.unknown_title)
                             )
 
                             TagRow(
                                 tag = context.resources.getString(R.string.album),
-                                value = track.album ?: context.resources.getString(R.string.unknown_album)
+                                value = album ?: context.resources.getString(R.string.unknown_album)
                             )
 
                             TagRow(
                                 tag = context.resources.getString(R.string.artist),
-                                value = track.artist
+                                value = artist
                                     ?: context.resources.getString(R.string.unknown_artist)
                             )
 
                             TagRow(
                                 tag = context.resources.getString(R.string.album_artist),
-                                value = track.albumArtist
+                                value = albumArtist
                                     ?: context.resources.getString(R.string.unknown_album_artist)
                             )
 
                             TagRow(
                                 tag = context.resources.getString(R.string.genre),
-                                value = track.genre ?: context.resources.getString(R.string.unknown_genre)
+                                value = genre ?: context.resources.getString(R.string.unknown_genre)
                             )
 
                             TagRow(
                                 tag = context.resources.getString(R.string.year),
-                                value = track.year ?: context.resources.getString(R.string.unknown_year)
+                                value = year ?: context.resources.getString(R.string.unknown_year)
                             )
 
                             TagRow(
                                 tag = context.resources.getString(R.string.track_number),
-                                value = track.trackNumber
+                                value = trackNumber
                                     ?: context.resources.getString(R.string.unknown_track_number)
                             )
 
@@ -273,28 +272,34 @@ fun TrackInfoSheet(
 
                             TagRow(
                                 tag = context.resources.getString(R.string.bitrate),
-                                value = track.bitrate?.let { "$it kbps" }
+                                value = bitrate?.let { "$it kbps" }
                                     ?: context.resources.getString(
                                         R.string.unknown_bitrate
                                     )
                             )
 
-                            val durationMinutes = track.duration / 1000 / 60
-                            val durationSeconds = track.duration / 1000 % 60
-                            val durationString = "$durationMinutes".padStart(2, '0') +
-                                    ":" + "$durationSeconds".padStart(2, '0')
+                            val durationString = remember {
+                                val durationMinutes = duration / 1000 / 60
+                                val durationSeconds = duration / 1000 % 60
+                                "$durationMinutes".padStart(2, '0') +
+                                        ":" + "$durationSeconds".padStart(2, '0')
+                            }
                             TagRow(
                                 tag = context.resources.getString(R.string.duration),
                                 value = durationString
                             )
 
-                            val sizeString = "${(track.size / 1024f / 1024 * 100).roundToInt() / 100f} MB"
+                            val sizeString = remember {
+                                "${(size / 1024f / 1024 * 100).roundToInt() / 100f} MB"
+                            }
                             TagRow(
                                 tag = context.resources.getString(R.string.size),
                                 value = sizeString
                             )
 
-                            val dateString = DateFormat.getDateInstance().format(Date(track.dateModified * 1000L))
+                            val dateString = remember {
+                                DateFormat.getDateInstance().format(Date(dateModified * 1000L))
+                            }
                             TagRow(
                                 tag = context.resources.getString(R.string.date_modified),
                                 value = dateString
@@ -302,7 +307,7 @@ fun TrackInfoSheet(
 
                             TagRow(
                                 tag = context.resources.getString(R.string.path),
-                                value = track.data
+                                value = data
                             )
 
                             Spacer(modifier = Modifier.height(50.dp))
