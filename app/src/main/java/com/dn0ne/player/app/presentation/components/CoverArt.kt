@@ -33,10 +33,10 @@ fun CoverArt(
     var bitmap by remember(uri) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(uri) {
-        if (uri != null) {
-            bitmap = ArtworkLoader.loadArtwork(context, uri, null)
+        bitmap = if (uri != null) {
+            ArtworkLoader.loadArtwork(context, uri)
         } else {
-            bitmap = null
+            null
         }
     }
 
