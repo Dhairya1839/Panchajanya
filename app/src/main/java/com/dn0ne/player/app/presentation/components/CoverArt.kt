@@ -26,14 +26,18 @@ import com.dn0ne.player.ArtworkLoader
 
 @Composable
 fun CoverArt(
-    uri: Uri,
+    uri: Uri?,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var bitmap by remember(uri) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(uri) {
-        bitmap = ArtworkLoader.loadArtwork(context, uri, null)
+        if (uri != null) {
+            bitmap = ArtworkLoader.loadArtwork(context, uri, null)
+        } else {
+            bitmap = null
+        }
     }
 
     Box(
@@ -42,9 +46,10 @@ fun CoverArt(
             .background(color = MaterialTheme.colorScheme.surfaceContainer),
         contentAlignment = Alignment.Center
     ) {
-        if (bitmap != null) {
+        val currentBitmap = bitmap
+        if (currentBitmap != null) {
             Image(
-                bitmap = bitmap!!.asImageBitmap(),
+                bitmap = currentBitmap.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
