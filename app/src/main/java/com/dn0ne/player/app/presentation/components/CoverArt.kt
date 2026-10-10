@@ -1,6 +1,5 @@
 package com.dn0ne.player.app.presentation.components
 
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -28,18 +28,18 @@ import com.dn0ne.player.ArtworkLoader
 fun CoverArt(
     uri: Uri?,
     modifier: Modifier = Modifier,
-    onCoverArtLoaded: ((Bitmap?) -> Unit)? = null
+    onCoverArtLoaded: ((ImageBitmap?) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    var bitmap by remember(uri) { mutableStateOf<Bitmap?>(null) }
+    var imageBitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
 
     LaunchedEffect(uri) {
         val loadedBitmap = if (uri != null) {
-            ArtworkLoader.loadArtwork(context, uri)
+            ArtworkLoader.loadArtwork(context, uri)?.asImageBitmap()
         } else {
             null
         }
-        bitmap = loadedBitmap
+        imageBitmap = loadedBitmap
         onCoverArtLoaded?.invoke(loadedBitmap)
     }
 
@@ -49,10 +49,10 @@ fun CoverArt(
             .background(color = MaterialTheme.colorScheme.surfaceContainer),
         contentAlignment = Alignment.Center
     ) {
-        val currentBitmap = bitmap
+        val currentBitmap = imageBitmap
         if (currentBitmap != null) {
             Image(
-                bitmap = currentBitmap.asImageBitmap(),
+                bitmap = currentBitmap,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
