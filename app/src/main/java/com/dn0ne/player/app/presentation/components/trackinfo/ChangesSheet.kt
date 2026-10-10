@@ -98,9 +98,8 @@ fun ChangesSheet(
                         .padding(horizontal = 16.dp)
                 )
             },
-            collapsedByDefault = true,
-            collapseFraction = {
-                collapseFraction = it
+            collapseFraction = { fraction ->
+                collapseFraction = fraction
             },
             contentPadding = PaddingValues(horizontal = 16.dp),
             contentHorizontalAlignment = Alignment.CenterHorizontally,
