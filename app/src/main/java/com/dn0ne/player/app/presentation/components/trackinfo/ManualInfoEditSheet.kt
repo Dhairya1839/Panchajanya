@@ -122,9 +122,8 @@ fun ManualInfoEditSheet(
                         .padding(horizontal = 16.dp)
                 )
             },
-            collapsedByDefault = true,
-            collapseFraction = {
-                collapseFraction = it
+            collapseFraction = { fraction ->
+                collapseFraction = fraction
             },
             contentPadding = PaddingValues(horizontal = 20.dp),
             contentHorizontalAlignment = Alignment.CenterHorizontally,
@@ -392,6 +391,5 @@ fun TagTextField(
                 )
             }
         }
-
     }
 }
